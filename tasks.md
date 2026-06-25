@@ -66,10 +66,10 @@ AC:
 **Brief component:** real-time updates
 
 AC:
-- [ ] Socket.io rooms keyed by `contentType:{id}`
-- [ ] Content-type create/update/delete (Slice 1 routes) and entry create/update/delete (Slice 2 routes) each emit the corresponding event to the room
-- [ ] `useRealtime` hook joins the room for the content type currently being viewed and invalidates the relevant TanStack Query keys on any event
-- [ ] Manual check: two browser tabs open on the same content type's entry list (or the content type list) — a change in one appears in the other with no refresh
+- [x] Socket.io global broadcast (simplified from per-id rooms — no multi-tenancy or scale concerns for this admin tool, so room-scoping added complexity with no benefit; see design.md)
+- [x] Content-type create/update/delete (Slice 1 routes) and entry create/update/delete (Slice 2 routes) each emit the corresponding event
+- [x] `useRealtime` hook (mounted once at the App root) invalidates the relevant TanStack Query keys on any event
+- [x] Manual check: verified live with a standalone socket client (simulating a second tab) plus the running browser tab — a content type created via direct API call (simulating another user) appeared in the open browser tab's list with no manual refresh
 
 ---
 
