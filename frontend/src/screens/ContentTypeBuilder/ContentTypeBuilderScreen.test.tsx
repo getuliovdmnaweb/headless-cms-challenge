@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ApiError } from '../../services/apiClient'
 import * as contentTypesService from '../../services/contentTypes'
@@ -75,7 +75,7 @@ describe('ContentTypeBuilderScreen — create mode', () => {
 })
 
 describe('ContentTypeBuilderScreen — edit mode', () => {
-  it('pre-fills the form from the existing content type and saves changes', async () => {
+  beforeEach(() => {
     vi.mocked(contentTypesService.getContentType).mockResolvedValue({
       id: '1',
       name: 'Car',
@@ -85,21 +85,91 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
       createdAt: '',
       updatedAt: '',
     })
-    vi.mocked(contentTypesService.updateContentTypeFields).mockResolvedValue({
-      id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
-    })
+  })
 
+  it('pre-fills the form from the existing content type', async () => {
     renderScreen('/content-types/1/edit')
 
     await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
     expect(screen.getByPlaceholderText('Field name')).toHaveValue('brand')
+  })
+
+  it('commits a non-risky change directly without showing the preview', async () => {
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [] })
+    vi.mocked(contentTypesService.commitContentTypeChange).mockResolvedValue({
+      id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
+    })
+
+    renderScreen('/content-types/1/edit')
+    await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() =>
-      expect(contentTypesService.updateContentTypeFields).toHaveBeenCalledWith('1', [
-        { id: 'f1', name: 'brand', type: 'text', required: true },
-      ])
+      expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith(
+        '1',
+        [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+        {}
+      )
     )
+    expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
+  })
+
+  it('shows the change preview for a risky change and commits with the chosen backfills on confirm', async () => {
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
+      risky: true,
+      impacts: [
+        {
+          fieldId: 'f1',
+          fieldName: 'brand',
+          changes: ['required-changed'],
+          affectedCount: 1,
+          autoMigratedCount: 0,
+          needsAttention: [{ entryId: 'e1', currentValue: undefined }],
+        },
+      ],
+    })
+    vi.mocked(contentTypesService.commitContentTypeChange).mockResolvedValue({
+      id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
+    })
+
+    renderScreen('/content-types/1/edit')
+    await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Review content type change')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('Backfill value'), { target: { value: 'Unknown' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Commit changes' }))
+
+    await waitFor(() =>
+      expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith(
+        '1',
+        [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+        { f1: 'Unknown' }
+      )
+    )
+    await waitFor(() => expect(screen.getByText('Content type list screen')).toBeInTheDocument())
+  })
+
+  it('leaves the content type untouched when the preview is cancelled', async () => {
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
+      risky: true,
+      impacts: [
+        { fieldId: 'f1', fieldName: 'brand', changes: ['required-changed'], affectedCount: 1, autoMigratedCount: 0, needsAttention: [{ entryId: 'e1', currentValue: undefined }] },
+      ],
+    })
+
+    renderScreen('/content-types/1/edit')
+    await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    const heading = await screen.findByText('Review content type change')
+
+    fireEvent.click(within(heading.closest('div')!.parentElement!).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
+    expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
   })
 })

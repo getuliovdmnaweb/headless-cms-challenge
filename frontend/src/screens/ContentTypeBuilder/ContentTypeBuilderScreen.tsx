@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import ContentTypeChangePreview from '../../components/shared/ContentTypeChangePreview'
 import { ApiError } from '../../services/apiClient'
-import { useContentType, useUpdateContentTypeFields } from '../../hooks/useContentType'
+import {
+  useCommitContentTypeChange,
+  useContentType,
+  usePreviewContentTypeChange,
+} from '../../hooks/useContentType'
 import { useContentTypes, useCreateContentType } from '../../hooks/useContentTypes'
 import type { FieldDefinition } from '../../types/contentType'
+import type { ChangePreview } from '../../types/evolution'
 import { createEmptyField, slugify } from './ContentTypeBuilderScreen.utils'
 import FieldRow from './FieldRow'
 
@@ -17,13 +23,15 @@ export default function ContentTypeBuilderScreen() {
   const { data: existing } = useContentType(id)
   const { data: allContentTypes } = useContentTypes()
   const createMutation = useCreateContentType()
-  const updateMutation = useUpdateContentTypeFields(id ?? '')
+  const previewMutation = usePreviewContentTypeChange(id ?? '')
+  const commitMutation = useCommitContentTypeChange(id ?? '')
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [errors, setErrors] = useState<{ name?: string; slug?: string }>({})
+  const [pendingPreview, setPendingPreview] = useState<ChangePreview | null>(null)
 
   useEffect(() => {
     if (existing) {
@@ -59,15 +67,26 @@ export default function ContentTypeBuilderScreen() {
     setFields(next)
   }
 
+  async function commitAndNavigate(backfills: Record<string, unknown>) {
+    await commitMutation.mutateAsync({ fields, backfills })
+    setPendingPreview(null)
+    navigate('/')
+  }
+
   async function handleSubmit() {
     setErrors({})
     try {
       if (isEdit) {
-        await updateMutation.mutateAsync(fields)
+        const preview = await previewMutation.mutateAsync(fields)
+        if (preview.risky) {
+          setPendingPreview(preview)
+          return
+        }
+        await commitAndNavigate({})
       } else {
         await createMutation.mutateAsync({ name, slug, fields })
+        navigate('/')
       }
-      navigate('/')
     } catch (err) {
       if (err instanceof ApiError && err.field) {
         setErrors({ [err.field]: err.message })
@@ -120,6 +139,14 @@ export default function ContentTypeBuilderScreen() {
         <Button label={isEdit ? 'Save changes' : 'Create content type'} onClick={handleSubmit} />
         <Button label="Cancel" variant="secondary" onClick={() => navigate('/')} />
       </div>
+
+      {pendingPreview && (
+        <ContentTypeChangePreview
+          impacts={pendingPreview.impacts}
+          onCommit={commitAndNavigate}
+          onCancel={() => setPendingPreview(null)}
+        />
+      )}
     </div>
   )
 }

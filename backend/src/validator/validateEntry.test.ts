@@ -1,5 +1,27 @@
 import type { FieldDefinition } from '../repositories/contentTypes';
-import { validateEntry } from './validateEntry';
+import { validateEntry, validateField } from './validateEntry';
+
+describe('validateField', () => {
+  it('returns a required error for a missing required field', () => {
+    const field: FieldDefinition = { id: 'f1', name: 'brand', type: 'text', required: true };
+    expect(validateField(field, undefined)).toEqual({ field: 'brand', reason: 'required' });
+  });
+
+  it('returns a type error for a value that does not match', () => {
+    const field: FieldDefinition = { id: 'f1', name: 'year', type: 'number', required: false };
+    expect(validateField(field, 'not-a-number')).toEqual({ field: 'year', reason: 'type' });
+  });
+
+  it('returns null for a valid value', () => {
+    const field: FieldDefinition = { id: 'f1', name: 'brand', type: 'text', required: true };
+    expect(validateField(field, 'Toyota')).toBeNull();
+  });
+
+  it('returns null for a missing optional field', () => {
+    const field: FieldDefinition = { id: 'f1', name: 'year', type: 'number', required: false };
+    expect(validateField(field, undefined)).toBeNull();
+  });
+});
 
 describe('validateEntry', () => {
   it('passes when all required fields are present and typed correctly', () => {

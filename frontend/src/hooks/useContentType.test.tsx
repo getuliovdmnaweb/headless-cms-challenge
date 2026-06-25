@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import * as contentTypesService from '../services/contentTypes'
-import { useContentType, useUpdateContentTypeFields } from './useContentType'
+import { useCommitContentTypeChange, useContentType, usePreviewContentTypeChange, useUpdateContentTypeFields } from './useContentType'
 
 vi.mock('../services/contentTypes')
 
@@ -50,5 +50,40 @@ describe('useUpdateContentTypeFields', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['contentTypes', '1'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['contentTypes'] })
+  })
+})
+
+describe('usePreviewContentTypeChange', () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it('calls the preview service with the proposed fields', async () => {
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: true, impacts: [] })
+    const { wrapper } = withQueryClient()
+
+    const { result } = renderHook(() => usePreviewContentTypeChange('1'), { wrapper })
+    const preview = await result.current.mutateAsync([])
+
+    expect(contentTypesService.previewContentTypeChange).toHaveBeenCalledWith('1', [])
+    expect(preview.risky).toBe(true)
+  })
+})
+
+describe('useCommitContentTypeChange', () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it('invalidates content type and entries queries on success', async () => {
+    vi.mocked(contentTypesService.commitContentTypeChange).mockResolvedValue({
+      id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
+    })
+    const { wrapper, queryClient } = withQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+    const { result } = renderHook(() => useCommitContentTypeChange('1'), { wrapper })
+    await result.current.mutateAsync({ fields: [], backfills: {} })
+
+    expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith('1', [], {})
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['contentTypes', '1'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['contentTypes'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['entries', '1'] })
   })
 })

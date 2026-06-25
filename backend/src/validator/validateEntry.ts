@@ -25,22 +25,22 @@ function matchesType(field: FieldDefinition, value: unknown): boolean {
   }
 }
 
+export function validateField(field: FieldDefinition, value: unknown): ValidationError | null {
+  if (isEmpty(value)) {
+    return field.required ? { field: field.name, reason: 'required' } : null;
+  }
+  if (!matchesType(field, value)) {
+    return { field: field.name, reason: 'type' };
+  }
+  return null;
+}
+
 export function validateEntry(fields: FieldDefinition[], data: Record<string, unknown>): ValidationError[] {
   const errors: ValidationError[] = [];
 
   for (const field of fields) {
-    const value = data[field.name];
-
-    if (isEmpty(value)) {
-      if (field.required) {
-        errors.push({ field: field.name, reason: 'required' });
-      }
-      continue;
-    }
-
-    if (!matchesType(field, value)) {
-      errors.push({ field: field.name, reason: 'type' });
-    }
+    const error = validateField(field, data[field.name]);
+    if (error) errors.push(error);
   }
 
   return errors;
