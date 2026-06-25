@@ -13,14 +13,9 @@ const EVENTS: RealtimeEvent[] = [
 export function attachRealtime(httpServer: HTTPServer, corsOrigin: string) {
   const io = new IOServer(httpServer, { cors: { origin: corsOrigin } });
 
-  io.on('connection', (socket) => {
-    socket.on('join', (contentTypeId: string) => socket.join(`contentType:${contentTypeId}`));
-    socket.on('leave', (contentTypeId: string) => socket.leave(`contentType:${contentTypeId}`));
-  });
-
   for (const event of EVENTS) {
-    bus.on(event, (payload: { contentTypeId: string }) => {
-      io.to(`contentType:${payload.contentTypeId}`).emit(event, payload);
+    bus.on(event, (payload) => {
+      io.emit(event, payload);
     });
   }
 
