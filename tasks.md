@@ -31,14 +31,14 @@ AC:
 The first vertical slice: a user can define an arbitrary content type — any name, any fields — and see it listed and editable. This is the foundation everything else builds on.
 
 AC:
-- [ ] `GET /api/content-types` lists all content types with field/entry counts
-- [ ] `POST /api/content-types` creates a content type (name, slug auto-derived + uniqueness enforced, fields: name/type/required/reference target)
-- [ ] `GET /api/content-types/:id` returns one content type
-- [ ] `PATCH /api/content-types/:id` applies field edits directly (risky-change preview arrives in Slice 4 — for now, edits just apply)
-- [ ] `DELETE /api/content-types/:id` deletes a content type and its entries
-- [ ] Content Type List screen: table of types, "New content type" action, "Edit fields" action per row
-- [ ] Content Type Builder screen: name + slug, add/remove/reorder fields, set type/required/reference-target per field, create and edit share the same form
-- [ ] Validation errors (e.g. duplicate slug, empty name) return 400 with field-level messages and surface inline in the builder
+- [x] `GET /api/content-types` lists all content types with field/entry counts
+- [x] `POST /api/content-types` creates a content type (name, slug auto-derived + uniqueness enforced, fields: name/type/required/reference target)
+- [x] `GET /api/content-types/:id` returns one content type
+- [x] `PATCH /api/content-types/:id` applies field edits directly (risky-change preview arrives in Slice 4 — for now, edits just apply)
+- [x] `DELETE /api/content-types/:id` deletes a content type and its entries
+- [x] Content Type List screen: table of types, "New content type" action, "Edit fields" action per row
+- [x] Content Type Builder screen: name + slug, add/remove/reorder fields, set type/required/reference-target per field, create and edit share the same form
+- [x] Validation errors (e.g. duplicate slug, empty name) return 400 with field-level messages and surface inline in the builder
 
 ---
 
