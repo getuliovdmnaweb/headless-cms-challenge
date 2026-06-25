@@ -30,6 +30,20 @@ describe('migrateEntryData', () => {
     expect(migrateEntryData(diffs, { year: 'early 2000s' }, { f1: 1999 })).toEqual({ year: 1999 });
   });
 
+  it('coerces a backfill value submitted as a string (e.g. from a text input) to the field type', () => {
+    const oldField: FieldDefinition = { id: 'f1', name: 'year', type: 'text', required: false };
+    const newField: FieldDefinition = { id: 'f1', name: 'year', type: 'number', required: false };
+    const diffs: FieldDiff[] = [{ fieldId: 'f1', oldField, newField, changes: ['type-changed'] }];
+    expect(migrateEntryData(diffs, { year: 'early 2000s' }, { f1: '1999' })).toEqual({ year: 1999 });
+  });
+
+  it('coerces a string backfill of "true"/"false" to a boolean for a boolean field', () => {
+    const oldField: FieldDefinition = { id: 'f1', name: 'active', type: 'text', required: false };
+    const newField: FieldDefinition = { id: 'f1', name: 'active', type: 'boolean', required: false };
+    const diffs: FieldDiff[] = [{ fieldId: 'f1', oldField, newField, changes: ['type-changed'] }];
+    expect(migrateEntryData(diffs, { active: 'yes' }, { f1: 'true' })).toEqual({ active: true });
+  });
+
   it('leaves an invalid value as-is when no backfill is provided (flag and allow)', () => {
     const oldField: FieldDefinition = { id: 'f1', name: 'year', type: 'text', required: false };
     const newField: FieldDefinition = { id: 'f1', name: 'year', type: 'number', required: false };
