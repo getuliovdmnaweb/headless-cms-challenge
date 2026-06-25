@@ -15,7 +15,7 @@ describe('commitContentTypeChange', () => {
     });
 
     const newFields = [{ id: 'f1', name: 'make', type: 'text' as const, required: true }];
-    const result = await commitContentTypeChange(car.id, newFields, {});
+    const result = (await commitContentTypeChange(car.id, newFields, {}))!;
 
     expect(result.contentType.fields).toEqual(newFields);
     expect(result.contentType.version).toBe(2);
@@ -29,7 +29,7 @@ describe('commitContentTypeChange', () => {
     const entry = await createEntry(car.id, car.version, { brand: 'Toyota' });
 
     const newFields = [{ id: 'f1', name: 'make', type: 'text' as const, required: false }];
-    const result = await commitContentTypeChange(car.id, newFields, {});
+    const result = (await commitContentTypeChange(car.id, newFields, {}))!;
 
     expect(result.migratedEntryIds).toEqual([entry.id]);
     const migrated = await getEntry(car.id, entry.id, newFields);
@@ -60,7 +60,7 @@ describe('commitContentTypeChange', () => {
     const badEntry = await createEntry(car.id, car.version, { year: 'early 2000s' });
 
     const newFields = [{ id: 'f1', name: 'year', type: 'number' as const, required: false }];
-    const result = await commitContentTypeChange(car.id, newFields, {});
+    const result = (await commitContentTypeChange(car.id, newFields, {}))!;
 
     expect(result.contentType.version).toBe(2);
     const migrated = await getEntry(car.id, badEntry.id, newFields);
