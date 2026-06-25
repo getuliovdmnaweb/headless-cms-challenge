@@ -15,6 +15,7 @@ function renderScreen() {
           <Route path="/" element={<ContentTypeListScreen />} />
           <Route path="/content-types/new" element={<div>New content type screen</div>} />
           <Route path="/content-types/:id/edit" element={<div>Edit content type screen</div>} />
+          <Route path="/content-types/:id/entries" element={<div>Entry list screen</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -61,5 +62,16 @@ describe('ContentTypeListScreen', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit fields' }))
 
     await waitFor(() => expect(screen.getByText('Edit content type screen')).toBeInTheDocument())
+  })
+
+  it('navigates to the entries screen for a content type', async () => {
+    vi.mocked(contentTypesService.getContentTypes).mockResolvedValue([
+      { id: '1', name: 'Car', slug: 'car', version: 1, fields: [], fieldCount: 0, entryCount: 0, createdAt: '', updatedAt: '' },
+    ])
+    renderScreen()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'View entries' }))
+
+    await waitFor(() => expect(screen.getByText('Entry list screen')).toBeInTheDocument())
   })
 })
