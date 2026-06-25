@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getContentType, updateContentTypeFields } from '../services/contentTypes'
+import { commitContentTypeChange, getContentType, previewContentTypeChange, updateContentTypeFields } from '../services/contentTypes'
 import type { FieldDefinition } from '../types/contentType'
 
 export function useContentType(id: string | undefined) {
@@ -17,6 +17,25 @@ export function useUpdateContentTypeFields(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contentTypes', id] })
       queryClient.invalidateQueries({ queryKey: ['contentTypes'] })
+    },
+  })
+}
+
+export function usePreviewContentTypeChange(id: string) {
+  return useMutation({
+    mutationFn: (fields: FieldDefinition[]) => previewContentTypeChange(id, fields),
+  })
+}
+
+export function useCommitContentTypeChange(id: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ fields, backfills }: { fields: FieldDefinition[]; backfills: Record<string, unknown> }) =>
+      commitContentTypeChange(id, fields, backfills),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contentTypes', id] })
+      queryClient.invalidateQueries({ queryKey: ['contentTypes'] })
+      queryClient.invalidateQueries({ queryKey: ['entries', id] })
     },
   })
 }
