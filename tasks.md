@@ -50,13 +50,13 @@ AC:
 For any content type created in Slice 1, full content management through a form generated entirely from its field list — no hand-coded form per content type.
 
 AC:
-- [ ] Validator module: `validateEntry(fields, data)` → field-level errors (required-missing, type-mismatch); covers text/number/boolean/date/reference
-- [ ] `GET /api/content-types/:contentTypeId/entries` lists entries, each annotated with `isValid`/`errors` computed against the content type's current fields
-- [ ] `POST /api/content-types/:contentTypeId/entries` creates an entry, rejects on required/type validation failure
-- [ ] `GET/PATCH/DELETE /api/content-types/:contentTypeId/entries/:id`
-- [ ] Reference fields validated against existence of the target entry
-- [ ] Entry List screen: columns derived from the content type's fields, validity badge per row, create/edit/delete actions
-- [ ] Entry Editor screen: form generated per field type (text/number/boolean/date input, reference picker sourced from the target content type's entries), create and edit share the same form, server validation errors shown inline
+- [x] Validator module: `validateEntry(fields, data)` → field-level errors (required-missing, type-mismatch); covers text/number/boolean/date/reference
+- [x] `GET /api/content-types/:contentTypeId/entries` lists entries, each annotated with `isValid`/`errors` computed against the content type's current fields
+- [x] `POST /api/content-types/:contentTypeId/entries` creates an entry, rejects on required/type validation failure
+- [x] `GET/PATCH/DELETE /api/content-types/:contentTypeId/entries/:id`
+- [x] Reference fields validated against existence of the target entry
+- [x] Entry List screen: columns derived from the content type's fields, validity badge per row, create/edit/delete actions
+- [x] Entry Editor screen: form generated per field type (text/number/boolean/date input, reference picker sourced from the target content type's entries), create and edit share the same form, server validation errors shown inline
 
 ---
 
