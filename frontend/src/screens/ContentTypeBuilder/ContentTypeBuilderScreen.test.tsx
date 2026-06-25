@@ -91,7 +91,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
 
     renderScreen('/content-types/1/edit')
 
-    expect(await screen.findByPlaceholderText('Name')).toHaveValue('Car')
+    await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
     expect(screen.getByPlaceholderText('Field name')).toHaveValue('brand')
 
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
