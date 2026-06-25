@@ -34,12 +34,20 @@ export default function ContentTypeListScreen() {
               key: 'actions',
               header: '',
               render: (row) => (
-                <Button
-                  label="Edit fields"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate(`/content-types/${row.id}/edit`)}
-                />
+                <div className="flex gap-2">
+                  <Button
+                    label="View entries"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate(`/content-types/${row.id}/entries`)}
+                  />
+                  <Button
+                    label="Edit fields"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate(`/content-types/${row.id}/edit`)}
+                  />
+                </div>
               ),
             },
           ]}

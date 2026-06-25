@@ -1,13 +1,27 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
+export interface ApiFieldError {
+  field: string
+  message?: string
+  reason?: string
+}
+
+interface ApiErrorBody {
+  error?: ApiFieldError
+  errors?: ApiFieldError[]
+}
+
 export class ApiError extends Error {
   status: number
   field?: string
+  errors: ApiFieldError[]
 
-  constructor(status: number, error?: { field?: string; message?: string }) {
-    super(error?.message || 'Request failed')
+  constructor(status: number, body?: ApiErrorBody) {
+    const errors = body?.errors ?? (body?.error ? [body.error] : [])
+    super(errors[0]?.message || 'Request failed')
     this.status = status
-    this.field = error?.field
+    this.field = errors[0]?.field
+    this.errors = errors
   }
 }
 
@@ -19,7 +33,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, body.error)
+    throw new ApiError(res.status, body)
   }
 
   if (res.status === 204) {
