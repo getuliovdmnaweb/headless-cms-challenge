@@ -7,6 +7,7 @@ import {
   listContentTypes,
   updateContentTypeFields,
 } from '../repositories/contentTypes';
+import { emit } from '../realtime/bus';
 
 export const contentTypesRouter = Router();
 
@@ -22,6 +23,7 @@ contentTypesRouter.post('/', async (req, res) => {
       fields: req.body.fields ?? [],
     });
     res.status(201).json(created);
+    emit('contentType:updated', { contentTypeId: created.id });
   } catch (err) {
     if (err instanceof ContentTypeError) {
       const field = err.code === 'DUPLICATE_SLUG' ? 'slug' : 'name';
@@ -41,10 +43,12 @@ contentTypesRouter.patch('/:id', async (req, res) => {
   const updated = await updateContentTypeFields(req.params.id, req.body.fields ?? []);
   if (!updated) return res.status(404).json({ error: { message: 'Content type not found' } });
   res.json(updated);
+  emit('contentType:updated', { contentTypeId: updated.id });
 });
 
 contentTypesRouter.delete('/:id', async (req, res) => {
   const deleted = await deleteContentType(req.params.id);
   if (!deleted) return res.status(404).json({ error: { message: 'Content type not found' } });
   res.status(204).send();
+  emit('contentType:deleted', { contentTypeId: req.params.id });
 });
