@@ -108,5 +108,5 @@ AC:
 **Depends on:** all above
 
 AC:
-- [ ] README: prerequisites, `docker compose up`, install/run for backend + frontend, env vars, how to exercise each of the 5 brief requirements
-- [ ] Presentation outline drafted (architecture, data model, real-time, content type evolution, trade-offs) sized for ≤15 slides / <10 min
+- [x] README: prerequisites, `docker compose up`, install/run for backend + frontend, env vars, how to exercise each of the 5 brief requirements
+- [x] Presentation outline drafted (architecture, data model, real-time, content type evolution, trade-offs) sized for ≤15 slides / <10 min
