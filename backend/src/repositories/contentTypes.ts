@@ -103,6 +103,14 @@ export async function getContentType(id: string): Promise<ContentType | null> {
   return result.rows[0] ? toContentType(result.rows[0]) : null;
 }
 
+export async function getContentTypeBySlug(slug: string): Promise<ContentType | null> {
+  const result = await pool.query(
+    `SELECT id, name, slug, version, fields, created_at, updated_at FROM content_types WHERE slug = $1`,
+    [slug]
+  );
+  return result.rows[0] ? toContentType(result.rows[0]) : null;
+}
+
 export async function updateContentTypeFields(
   id: string,
   fields: FieldDefinition[]

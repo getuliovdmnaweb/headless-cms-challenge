@@ -97,9 +97,9 @@ AC:
 **Brief component:** read API. No UI — backend only.
 
 AC:
-- [ ] `GET /api/content/:type` → 200 with entries for content type slug `:type`, 404 if slug unknown
-- [ ] `GET /api/content/:type/:id` → 200 with single entry, 404 if missing
-- [ ] No admin-only fields (e.g. raw validation internals) leak into the public response
+- [x] `GET /api/content/:type` → 200 with entries for content type slug `:type`, 404 if slug unknown
+- [x] `GET /api/content/:type/:id` → 200 with single entry, 404 if missing
+- [x] No admin-only fields (e.g. raw validation internals) leak into the public response
 
 ---
 

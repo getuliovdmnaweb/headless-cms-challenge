@@ -4,6 +4,7 @@ import {
   createContentType,
   deleteContentType,
   getContentType,
+  getContentTypeBySlug,
   listContentTypes,
   updateContentTypeFields,
 } from './contentTypes';
@@ -67,6 +68,18 @@ describe('getContentType', () => {
   it('returns the content type for a known id', async () => {
     const created = await createContentType({ name: 'Recipe', fields: [] });
     const found = await getContentType(created.id);
+    expect(found?.name).toBe('Recipe');
+  });
+});
+
+describe('getContentTypeBySlug', () => {
+  it('returns null for an unknown slug', async () => {
+    expect(await getContentTypeBySlug('unknown')).toBeNull();
+  });
+
+  it('returns the content type for a known slug', async () => {
+    await createContentType({ name: 'Recipe', fields: [] });
+    const found = await getContentTypeBySlug('recipe');
     expect(found?.name).toBe('Recipe');
   });
 });
