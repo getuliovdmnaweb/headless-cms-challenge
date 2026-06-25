@@ -2,7 +2,7 @@ import type { FieldDefinition } from '../repositories/contentTypes';
 
 export interface ValidationError {
   field: string;
-  reason: 'required' | 'type';
+  reason: 'required' | 'type' | 'reference';
 }
 
 function isEmpty(value: unknown): boolean {
