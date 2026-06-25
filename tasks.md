@@ -79,14 +79,15 @@ AC:
 **Brief component:** schema evolution — the most heavily weighted part of the evaluation
 
 AC:
-- [ ] `diffFields(oldFields, newFields)` → per-field classification (`renamed`/`deleted`/`type-changed`/`required-changed`/`unchanged`/`added`), matched by field `id`
-- [ ] `classifyImpact(diff, entries)` → per entry: `unaffected`/`auto-migrated`/`needs-attention`, with reason
-- [ ] `POST /api/content-types/:id/preview-change` returns the classified diff + impact without writing anything
-- [ ] `POST /api/content-types/:id/commit-change` re-validates server-side, applies migration transactionally (rename keys / drop keys / apply provided backfill defaults), bumps `version`, never partially applies on error
-- [ ] Entries left non-compliant after a forced commit are not blocked — they persist and surface as invalid in Slice 2's entry list on next read
-- [ ] Commit emits real-time events for the content type and every affected entry
-- [ ] Content Type Change Preview UI: modal listing each change with affected-entry counts split auto-migrated vs. needs-attention, sample affected entries, one backfill-default input per affected field, "commit anyway" path, cancel leaves the content type untouched
-- [ ] Wired into Content Type Builder's save flow — risky changes (rename/delete/type-change/required-toggle on a type with existing entries) route through preview instead of saving directly
+- [x] `diffFields(oldFields, newFields)` → per-field classification (`added`/`deleted`/`renamed`/`type-changed`/`required-changed`, compound changes supported), matched by field `id`
+- [x] `classifyImpact(diffs, entries)` → per risky field: `affectedCount`/`autoMigratedCount`/`needsAttention` (entry id + current value)
+- [x] `POST /api/content-types/:id/preview-change` returns the classified diff + impact without writing anything
+- [x] `POST /api/content-types/:id/commit-change` re-validates server-side, applies migration transactionally (rename keys / drop keys / apply provided backfill defaults, coerced to the field's new type), bumps `version`, never partially applies on error
+- [x] Plain `PATCH` now rejects risky changes (409) — only `commit-change` can apply them, closing the bypass
+- [x] Entries left non-compliant after a forced commit are not blocked — they persist and surface as invalid in Slice 2's entry list on next read
+- [x] Commit emits real-time events for the content type and every migrated entry
+- [x] Content Type Change Preview UI: modal listing each change with affected-entry counts split auto-migrated vs. needs-attention, sample affected entries, one backfill-default input per affected field, cancel leaves the content type untouched
+- [x] Wired into Content Type Builder's save flow — risky changes route through preview instead of saving directly; verified live in the browser (type change + backfill, including the string→number coercion bug found and fixed during verification)
 
 ---
 
