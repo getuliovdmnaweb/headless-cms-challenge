@@ -1,12 +1,17 @@
 import request from 'supertest';
 import { createApp } from '../app';
 import { pool } from '../db';
+import { bus } from '../realtime/bus';
 import { resetDb } from '../testUtils/resetDb';
 
 const app = createApp();
 
 beforeEach(resetDb);
 afterAll(() => pool.end());
+
+function waitForEvent(event: string): Promise<any> {
+  return new Promise((resolve) => bus.once(event, resolve));
+}
 
 async function createCarContentType() {
   const res = await request(app)
@@ -30,6 +35,13 @@ describe('POST /api/content-types/:contentTypeId/entries', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data).toEqual({ brand: 'Toyota', year: 2022 });
+  });
+
+  it('emits an entry:created event', async () => {
+    const car = await createCarContentType();
+    const eventPromise = waitForEvent('entry:created');
+    const res = await request(app).post(`/api/content-types/${car.id}/entries`).send({ data: { brand: 'Toyota' } });
+    expect(await eventPromise).toEqual({ contentTypeId: car.id, entryId: res.body.id });
   });
 
   it('returns 400 with field errors for invalid data', async () => {
@@ -99,6 +111,15 @@ describe('PATCH /api/content-types/:contentTypeId/entries/:id', () => {
     expect(res.body.data).toEqual({ brand: 'Honda' });
   });
 
+  it('emits an entry:updated event', async () => {
+    const car = await createCarContentType();
+    const created = await request(app).post(`/api/content-types/${car.id}/entries`).send({ data: { brand: 'Toyota' } });
+
+    const eventPromise = waitForEvent('entry:updated');
+    await request(app).patch(`/api/content-types/${car.id}/entries/${created.body.id}`).send({ data: { brand: 'Honda' } });
+    expect(await eventPromise).toEqual({ contentTypeId: car.id, entryId: created.body.id });
+  });
+
   it('returns 400 with field errors for invalid data', async () => {
     const car = await createCarContentType();
     const created = await request(app).post(`/api/content-types/${car.id}/entries`).send({ data: { brand: 'Toyota' } });
@@ -119,6 +140,15 @@ describe('DELETE /api/content-types/:contentTypeId/entries/:id', () => {
     const res = await request(app).delete(`/api/content-types/${car.id}/entries/${created.body.id}`);
 
     expect(res.status).toBe(204);
+  });
+
+  it('emits an entry:deleted event', async () => {
+    const car = await createCarContentType();
+    const created = await request(app).post(`/api/content-types/${car.id}/entries`).send({ data: { brand: 'Toyota' } });
+
+    const eventPromise = waitForEvent('entry:deleted');
+    await request(app).delete(`/api/content-types/${car.id}/entries/${created.body.id}`);
+    expect(await eventPromise).toEqual({ contentTypeId: car.id, entryId: created.body.id });
   });
 
   it('returns 404 for an unknown entry', async () => {
