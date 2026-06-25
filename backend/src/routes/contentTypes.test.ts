@@ -1,12 +1,17 @@
 import request from 'supertest';
 import { createApp } from '../app';
 import { pool } from '../db';
+import { bus } from '../realtime/bus';
 import { resetDb } from '../testUtils/resetDb';
 
 const app = createApp();
 
 beforeEach(resetDb);
 afterAll(() => pool.end());
+
+function waitForEvent(event: string): Promise<any> {
+  return new Promise((resolve) => bus.once(event, resolve));
+}
 
 describe('POST /api/content-types', () => {
   it('creates a content type', async () => {
@@ -18,6 +23,12 @@ describe('POST /api/content-types', () => {
     expect(res.body.name).toBe('Car');
     expect(res.body.slug).toBe('car');
     expect(res.body.fields).toHaveLength(1);
+  });
+
+  it('emits a contentType:updated event', async () => {
+    const eventPromise = waitForEvent('contentType:updated');
+    const res = await request(app).post('/api/content-types').send({ name: 'Car', fields: [] });
+    expect(await eventPromise).toEqual({ contentTypeId: res.body.id });
   });
 
   it('returns a field-level 400 for an empty name', async () => {
@@ -76,6 +87,13 @@ describe('PATCH /api/content-types/:id', () => {
       .send({ fields: [] });
     expect(res.status).toBe(404);
   });
+
+  it('emits a contentType:updated event', async () => {
+    const created = await request(app).post('/api/content-types').send({ name: 'Car', fields: [] });
+    const eventPromise = waitForEvent('contentType:updated');
+    await request(app).patch(`/api/content-types/${created.body.id}`).send({ fields: [] });
+    expect(await eventPromise).toEqual({ contentTypeId: created.body.id });
+  });
 });
 
 describe('DELETE /api/content-types/:id', () => {
@@ -84,6 +102,13 @@ describe('DELETE /api/content-types/:id', () => {
     const res = await request(app).delete(`/api/content-types/${created.body.id}`);
     expect(res.status).toBe(204);
     expect((await request(app).get(`/api/content-types/${created.body.id}`)).status).toBe(404);
+  });
+
+  it('emits a contentType:deleted event', async () => {
+    const created = await request(app).post('/api/content-types').send({ name: 'Car', fields: [] });
+    const eventPromise = waitForEvent('contentType:deleted');
+    await request(app).delete(`/api/content-types/${created.body.id}`);
+    expect(await eventPromise).toEqual({ contentTypeId: created.body.id });
   });
 
   it('returns 404 for an unknown id', async () => {
