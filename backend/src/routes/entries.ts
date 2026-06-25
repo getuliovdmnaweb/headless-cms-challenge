@@ -2,6 +2,7 @@ import { Router, type Request } from 'express';
 import type { ParamsDictionary } from 'express-serve-static-core';
 import { getContentType } from '../repositories/contentTypes';
 import { createEntry, deleteEntry, entryExists, getEntry, listEntries, updateEntry } from '../repositories/entries';
+import { emit } from '../realtime/bus';
 import { validateEntry, type ValidationError } from '../validator/validateEntry';
 import type { FieldDefinition } from '../repositories/contentTypes';
 
@@ -47,6 +48,7 @@ entriesRouter.post('/', async (req: EntryRequest, res) => {
 
   const entry = await createEntry(contentType.id, contentType.version, req.body.data ?? {});
   res.status(201).json(entry);
+  emit('entry:created', { contentTypeId: contentType.id, entryId: entry.id });
 });
 
 entriesRouter.get('/:id', async (req: EntryRequest, res) => {
@@ -68,6 +70,7 @@ entriesRouter.patch('/:id', async (req: EntryRequest, res) => {
   const entry = await updateEntry(contentType.id, req.params.id, req.body.data ?? {});
   if (!entry) return res.status(404).json({ error: { message: 'Entry not found' } });
   res.json(entry);
+  emit('entry:updated', { contentTypeId: contentType.id, entryId: entry.id });
 });
 
 entriesRouter.delete('/:id', async (req: EntryRequest, res) => {
@@ -77,4 +80,5 @@ entriesRouter.delete('/:id', async (req: EntryRequest, res) => {
   const deleted = await deleteEntry(contentType.id, req.params.id);
   if (!deleted) return res.status(404).json({ error: { message: 'Entry not found' } });
   res.status(204).send();
+  emit('entry:deleted', { contentTypeId: contentType.id, entryId: req.params.id });
 });

@@ -7,8 +7,13 @@ export type RealtimeEvent =
   | 'entry:updated'
   | 'entry:deleted';
 
+export interface RealtimePayload {
+  contentTypeId: string;
+  entryId?: string;
+}
+
 export const bus = new EventEmitter();
 
-export function emit(event: RealtimeEvent, payload: { contentTypeId: string } & Record<string, unknown>) {
+export function emit(event: RealtimeEvent, payload: RealtimePayload) {
   bus.emit(event, payload);
 }
