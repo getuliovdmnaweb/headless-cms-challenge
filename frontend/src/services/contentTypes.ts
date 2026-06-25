@@ -1,5 +1,6 @@
 import { apiFetch } from './apiClient'
 import type { ContentType, ContentTypeSummary, FieldDefinition } from '../types/contentType'
+import type { ChangePreview } from '../types/evolution'
 
 export function getContentTypes(): Promise<ContentTypeSummary[]> {
   return apiFetch('/api/content-types')
@@ -19,4 +20,19 @@ export function updateContentTypeFields(id: string, fields: FieldDefinition[]): 
 
 export function deleteContentType(id: string): Promise<void> {
   return apiFetch(`/api/content-types/${id}`, { method: 'DELETE' })
+}
+
+export function previewContentTypeChange(id: string, fields: FieldDefinition[]): Promise<ChangePreview> {
+  return apiFetch(`/api/content-types/${id}/preview-change`, { method: 'POST', body: JSON.stringify({ fields }) })
+}
+
+export function commitContentTypeChange(
+  id: string,
+  fields: FieldDefinition[],
+  backfills: Record<string, unknown>
+): Promise<ContentType> {
+  return apiFetch(`/api/content-types/${id}/commit-change`, {
+    method: 'POST',
+    body: JSON.stringify({ fields, backfills }),
+  })
 }
