@@ -58,7 +58,7 @@ A content-type edit is "risky" when it can invalidate existing entries: **rename
 3. Response: per-change summary with counts + a sample of affected entry IDs/values for "needs attention" entries. Nothing is written yet.
 4. Frontend shows this in the Content Type Change Preview. User may supply one backfill default per "needs attention" field (applied to all entries in that bucket) and/or confirm.
 5. `POST /api/content-types/:id/commit-change` re-runs the same diff (server is the source of truth, never trusts a stale client-side preview) inside a transaction: updates `content_types.fields` + bumps `version`, rewrites each affected entry's `data` (rename keys, drop keys, apply backfill defaults where provided), sets `entries.content_type_version` to the new version. Entries that still don't validate after migration are **not blocked** — they're written as-is and simply show up as invalid on next read. This avoids a dead-end where the admin can't evolve a content type because some old entry can't be fixed synchronously.
-6. On commit, the server emits `contentType:updated` and `entry:updated` (per affected entry) over the content type's Socket.io room.
+6. On commit, the server broadcasts `contentType:updated` and `entry:updated` (per affected entry).
 
 ### Why "flag and allow" instead of "block until fixed"
 Blocking the content-type save until every entry is perfectly valid would mean a single bad legacy entry can permanently lock the content type. Real CMSs (Contentful included) let you evolve a model and surface non-compliant entries afterward rather than gate the edit on fixing all of them upfront. Flagged entries are fixable later through the normal Entry Editor, which surfaces the same validation errors inline.
@@ -67,11 +67,11 @@ Blocking the content-type save until every entry is perfectly valid would mean a
 Per-entry inline editing *inside* the preview modal is cut. The preview offers one bulk backfill value per affected field instead of a row-by-row editor. This is called out as a stretch goal in the presentation rather than silently dropped.
 
 ## Real-time
-Socket.io rooms keyed by `contentType:{contentTypeId}`. Admin clients join the room for whichever content type they're currently viewing (entry list or editor). Server emits on every mutation:
-- `contentType:updated` (content type list, builder)
+Socket.io with a global broadcast — no rooms. Every connected admin client receives every `contentType:*`/`entry:*` event; there's no multi-tenancy or scale concern for a single-user admin tool, so per-id room scoping would add complexity with no real benefit. Server emits on every mutation:
+- `contentType:updated` / `contentType:deleted` (content type list, builder)
 - `entry:created` / `entry:updated` / `entry:deleted` (entry list, editor)
 
-Frontend: a single `useRealtime(contentTypeId)` hook opens/reuses one socket connection and, on any event, calls `queryClient.invalidateQueries` for the relevant TanStack Query key. This means the real-time layer never duplicates state — it just tells the existing data-fetching layer "go refetch," so there's one source of truth for what's on screen.
+Frontend: a single `useRealtime()` hook, mounted once at the App root, opens one socket connection and, on any event, calls `queryClient.invalidateQueries` for the relevant TanStack Query keys (`['contentTypes']`, `['contentTypes', contentTypeId]`, `['entries', contentTypeId]`, and `['entries', contentTypeId, entryId]` when present). This means the real-time layer never duplicates state — it just tells the existing data-fetching layer "go refetch," so there's one source of truth for what's on screen.
 
 ## API surface
 

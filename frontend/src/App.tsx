@@ -3,8 +3,11 @@ import ContentTypeBuilderScreen from './screens/ContentTypeBuilder/ContentTypeBu
 import ContentTypeListScreen from './screens/ContentTypeListScreen'
 import EntryEditorScreen from './screens/EntryEditor/EntryEditorScreen'
 import EntryListScreen from './screens/EntryList/EntryListScreen'
+import { useRealtime } from './hooks/useRealtime'
 
 function App() {
+  useRealtime()
+
   return (
     <Routes>
       <Route path="/" element={<ContentTypeListScreen />} />
