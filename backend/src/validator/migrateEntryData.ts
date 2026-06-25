@@ -1,5 +1,23 @@
 import { validateField } from './validateEntry';
 import type { FieldDiff } from './diffFields';
+import type { FieldDefinition } from '../repositories/contentTypes';
+
+function coerceToFieldType(field: FieldDefinition, value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+
+  switch (field.type) {
+    case 'number': {
+      const coerced = Number(value);
+      return Number.isNaN(coerced) ? value : coerced;
+    }
+    case 'boolean':
+      if (value.toLowerCase() === 'true') return true;
+      if (value.toLowerCase() === 'false') return false;
+      return value;
+    default:
+      return value;
+  }
+}
 
 export function migrateEntryData(
   diffs: FieldDiff[],
@@ -21,7 +39,7 @@ export function migrateEntryData(
     const needsCheck = diff.changes.includes('type-changed') || diff.changes.includes('required-changed');
 
     if (needsCheck && validateField(diff.newField!, value) && diff.fieldId in backfillByFieldId) {
-      result[writeKey] = backfillByFieldId[diff.fieldId];
+      result[writeKey] = coerceToFieldType(diff.newField!, backfillByFieldId[diff.fieldId]);
     } else {
       result[writeKey] = value;
     }
