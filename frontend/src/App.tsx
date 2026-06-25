@@ -1,17 +1,13 @@
 import { Route, Routes } from 'react-router-dom'
-
-function ShellPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center text-gray-500">
-      Headless CMS
-    </div>
-  )
-}
+import ContentTypeBuilderScreen from './screens/ContentTypeBuilder/ContentTypeBuilderScreen'
+import ContentTypeListScreen from './screens/ContentTypeListScreen'
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<ShellPage />} />
+      <Route path="/" element={<ContentTypeListScreen />} />
+      <Route path="/content-types/new" element={<ContentTypeBuilderScreen />} />
+      <Route path="/content-types/:id/edit" element={<ContentTypeBuilderScreen />} />
     </Routes>
   )
 }
