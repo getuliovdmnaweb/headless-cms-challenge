@@ -58,7 +58,7 @@ A content-type edit is "risky" when it can invalidate existing entries: **rename
 3. Response: per-change summary with counts + a sample of affected entry IDs/values for "needs attention" entries. Nothing is written yet.
 4. Frontend shows this in the Content Type Change Preview. User may supply one backfill default per "needs attention" field (applied to all entries in that bucket) and/or confirm.
 5. `POST /api/content-types/:id/commit-change` re-runs the same diff (server is the source of truth, never trusts a stale client-side preview) inside a transaction: updates `content_types.fields` + bumps `version`, rewrites each affected entry's `data` (rename keys, drop keys, apply backfill defaults where provided), sets `entries.content_type_version` to the new version. Entries that still don't validate after migration are **not blocked** — they're written as-is and simply show up as invalid on next read. This avoids a dead-end where the admin can't evolve a content type because some old entry can't be fixed synchronously.
-6. On commit, the server emits `contentType:updated` and `entry:updated` (per affected entry) over the content type's Socket.io room.
+6. On commit, the server broadcasts `contentType:updated` and `entry:updated` (per affected entry).
 
 ### Why "flag and allow" instead of "block until fixed"
 Blocking the content-type save until every entry is perfectly valid would mean a single bad legacy entry can permanently lock the content type. Real CMSs (Contentful included) let you evolve a model and surface non-compliant entries afterward rather than gate the edit on fixing all of them upfront. Flagged entries are fixable later through the normal Entry Editor, which surfaces the same validation errors inline.
