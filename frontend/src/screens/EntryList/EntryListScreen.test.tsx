@@ -81,6 +81,30 @@ describe('EntryListScreen', () => {
     await waitFor(() => expect(screen.getByText('Edit entry screen')).toBeInTheDocument())
   })
 
+  it('renders a reference field as the label of the referenced entry, not its raw id', async () => {
+    vi.mocked(contentTypesService.getContentType).mockResolvedValue({
+      id: 'ct1',
+      name: 'Car',
+      slug: 'car',
+      version: 1,
+      fields: [{ id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' }],
+      createdAt: '',
+      updatedAt: '',
+    })
+    vi.mocked(entriesService.getEntries).mockImplementation((contentTypeId: string) =>
+      Promise.resolve(
+        contentTypeId === 'ct1'
+          ? [{ id: 'e1', contentTypeId: 'ct1', contentTypeVersion: 1, data: { owner: 'p1' }, isValid: true, errors: [], createdAt: '', updatedAt: '' }]
+          : [{ id: 'p1', contentTypeId: 'person', contentTypeVersion: 1, data: { name: 'Jane Doe' }, isValid: true, errors: [], createdAt: '', updatedAt: '' }]
+      )
+    )
+
+    renderScreen()
+
+    expect(await screen.findByText('Jane Doe')).toBeInTheDocument()
+    expect(screen.queryByText('p1')).not.toBeInTheDocument()
+  })
+
   it('deletes an entry', async () => {
     vi.mocked(entriesService.getEntries).mockResolvedValue([
       { id: 'e1', contentTypeId: 'ct1', contentTypeVersion: 1, data: { brand: 'Toyota' }, isValid: true, errors: [], createdAt: '', updatedAt: '' },
