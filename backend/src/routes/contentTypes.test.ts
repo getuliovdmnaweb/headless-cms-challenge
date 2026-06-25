@@ -94,6 +94,112 @@ describe('PATCH /api/content-types/:id', () => {
     await request(app).patch(`/api/content-types/${created.body.id}`).send({ fields: [] });
     expect(await eventPromise).toEqual({ contentTypeId: created.body.id });
   });
+
+  it('rejects a risky change (rename) and points to the evolution flow', async () => {
+    const created = await request(app)
+      .post('/api/content-types')
+      .send({ name: 'Car', fields: [{ id: 'f1', name: 'brand', type: 'text', required: false }] });
+
+    const res = await request(app)
+      .patch(`/api/content-types/${created.body.id}`)
+      .send({ fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
+
+    expect(res.status).toBe(409);
+  });
+});
+
+describe('POST /api/content-types/:id/preview-change', () => {
+  it('returns risky: false and no impacts for a non-risky change', async () => {
+    const created = await request(app).post('/api/content-types').send({ name: 'Car', fields: [] });
+
+    const res = await request(app)
+      .post(`/api/content-types/${created.body.id}/preview-change`)
+      .send({ fields: [{ id: 'f1', name: 'brand', type: 'text', required: false }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.risky).toBe(false);
+    expect(res.body.impacts).toEqual([]);
+  });
+
+  it('returns risky: true with classified impacts for a risky change, without writing anything', async () => {
+    const created = await request(app)
+      .post('/api/content-types')
+      .send({ name: 'Car', fields: [{ id: 'f1', name: 'year', type: 'text', required: false }] });
+    await request(app).post(`/api/content-types/${created.body.id}/entries`).send({ data: { year: 'early 2000s' } });
+
+    const res = await request(app)
+      .post(`/api/content-types/${created.body.id}/preview-change`)
+      .send({ fields: [{ id: 'f1', name: 'year', type: 'number', required: false }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.risky).toBe(true);
+    expect(res.body.impacts[0].needsAttention).toEqual([{ entryId: expect.any(String), currentValue: 'early 2000s' }]);
+
+    const unchanged = await request(app).get(`/api/content-types/${created.body.id}`);
+    expect(unchanged.body.version).toBe(1);
+  });
+
+  it('returns 404 for an unknown content type', async () => {
+    const res = await request(app)
+      .post('/api/content-types/00000000-0000-0000-0000-000000000000/preview-change')
+      .send({ fields: [] });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /api/content-types/:id/commit-change', () => {
+  it('applies the change, bumps the version, and migrates entries', async () => {
+    const created = await request(app)
+      .post('/api/content-types')
+      .send({ name: 'Car', fields: [{ id: 'f1', name: 'brand', type: 'text', required: false }] });
+    await request(app).post(`/api/content-types/${created.body.id}/entries`).send({ data: { brand: 'Toyota' } });
+
+    const res = await request(app)
+      .post(`/api/content-types/${created.body.id}/commit-change`)
+      .send({ fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBe(2);
+    expect(res.body.fields[0].name).toBe('make');
+  });
+
+  it('applies a provided backfill to entries needing attention', async () => {
+    const created = await request(app)
+      .post('/api/content-types')
+      .send({ name: 'Car', fields: [{ id: 'f1', name: 'year', type: 'text', required: false }] });
+    const entry = await request(app).post(`/api/content-types/${created.body.id}/entries`).send({ data: { year: 'early 2000s' } });
+
+    await request(app)
+      .post(`/api/content-types/${created.body.id}/commit-change`)
+      .send({ fields: [{ id: 'f1', name: 'year', type: 'number', required: false }], backfills: { f1: 1999 } });
+
+    const migrated = await request(app).get(`/api/content-types/${created.body.id}/entries/${entry.body.id}`);
+    expect(migrated.body.data).toEqual({ year: 1999 });
+    expect(migrated.body.isValid).toBe(true);
+  });
+
+  it('emits realtime events for the content type and each migrated entry', async () => {
+    const created = await request(app)
+      .post('/api/content-types')
+      .send({ name: 'Car', fields: [{ id: 'f1', name: 'brand', type: 'text', required: false }] });
+    const entry = await request(app).post(`/api/content-types/${created.body.id}/entries`).send({ data: { brand: 'Toyota' } });
+
+    const contentTypeEvent = waitForEvent('contentType:updated');
+    const entryEvent = waitForEvent('entry:updated');
+    await request(app)
+      .post(`/api/content-types/${created.body.id}/commit-change`)
+      .send({ fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
+
+    expect(await contentTypeEvent).toEqual({ contentTypeId: created.body.id });
+    expect(await entryEvent).toEqual({ contentTypeId: created.body.id, entryId: entry.body.id });
+  });
+
+  it('returns 404 for an unknown content type', async () => {
+    const res = await request(app)
+      .post('/api/content-types/00000000-0000-0000-0000-000000000000/commit-change')
+      .send({ fields: [] });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('DELETE /api/content-types/:id', () => {
