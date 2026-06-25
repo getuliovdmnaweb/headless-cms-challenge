@@ -64,7 +64,7 @@ describe('ContentTypeBuilderScreen — create mode', () => {
 
   it('shows a field-level error from the server', async () => {
     vi.mocked(contentTypesService.createContentType).mockRejectedValue(
-      new ApiError(400, { field: 'name', message: 'Name is required' })
+      new ApiError(400, { error: { field: 'name', message: 'Name is required' } })
     )
     renderScreen('/content-types/new')
 
