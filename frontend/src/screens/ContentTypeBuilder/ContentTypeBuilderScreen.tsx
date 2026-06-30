@@ -39,6 +39,7 @@ export default function ContentTypeBuilderScreen() {
   const [errors, setErrors] = useState<{ name?: string; slug?: string }>({})
   const [pendingPreview, setPendingPreview] = useState<ChangePreview | null>(null)
   const [conflict, setConflict] = useState<Conflict | null>(null)
+  const [loadedVersion, setLoadedVersion] = useState<number | undefined>()
 
   useEffect(() => {
     if (existing) {
@@ -46,6 +47,7 @@ export default function ContentTypeBuilderScreen() {
       setSlug(existing.slug)
       setFields(existing.fields)
       setSlugTouched(true)
+      setLoadedVersion(existing.version)
     }
   }, [existing])
 
@@ -103,6 +105,16 @@ export default function ContentTypeBuilderScreen() {
     try {
       if (isEdit) {
         const preview = await previewMutation.mutateAsync(fields)
+
+        if (loadedVersion !== undefined && preview.baseVersion !== loadedVersion) {
+          setConflict({
+            message: 'This content type changed since you started editing — review the latest version and try again.',
+            currentVersion: preview.baseVersion,
+            currentFields: preview.currentFields,
+          })
+          return
+        }
+
         if (preview.risky) {
           setPendingPreview(preview)
           return
