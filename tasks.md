@@ -91,6 +91,24 @@ AC:
 
 ---
 
+### SLICE 4b — Content Type Evolution: edge cases
+**Branch:** `feature/evolution-edge-cases`
+**Depends on:** Slice 4
+**Brief component:** schema evolution — open-ended follow-up ("when a field is renamed, deleted, retyped, made required, or a reference changes target... including when the schema shifts mid-edit")
+
+AC:
+- [x] `diffFields` detects `reference-target-changed` when a reference field's target content type changes, classified as risky
+- [x] `classifyImpact`/`migrateEntryData` validate reference fields against the *new* target's actual entries (previously only checked `typeof value === 'string'`), so entries pointing at a since-deleted or wrong-type target are correctly flagged `needsAttention`
+- [x] Broken references are now caught on every entry read (`GET` list/single), not just during an evolution preview — `entries.ts`'s `annotate()` made async and reference-aware
+- [x] Optimistic concurrency: `commit-change` takes a `baseVersion`; a concurrent commit since the client loaded the content type returns 409 with the current version + fields instead of silently overwriting
+- [x] Content Type Builder shows a conflict banner with the server's message and a "Reload latest version" action; in-progress local edits are never silently discarded
+- [x] Conflict is detected as early as the preview step (not just at commit) by comparing the preview response's `baseVersion` against the version the form loaded
+- [x] A background refetch (e.g. real-time invalidation firing from someone else's concurrent edit) does not silently overwrite an in-progress edit or move the conflict-detection baseline — form state syncs from the server once per load (`hasSyncedRef`), not on every cache update
+- [x] "Reload latest version" correctly pulls fresh fields into the form even when a prior background refetch already wrote that exact data into the TanStack Query cache — fixed a real bug where structural sharing kept the stale `data` object reference, so reads the refetch's resolved value directly instead of relying on a `[existing]`-keyed effect
+- [x] All scenarios live-verified in the browser end-to-end: reference-target change (risk shown, sample affected entries, broken entry flagged and fixable via the Entry Editor), and mid-edit shift (conflict shown, edit preserved, nothing committed until reload, reload pulls true latest state, resubmit succeeds)
+
+---
+
 ### SLICE 5 — Public read API
 **Branch:** `feature/read-api`
 **Depends on:** Slice 2
