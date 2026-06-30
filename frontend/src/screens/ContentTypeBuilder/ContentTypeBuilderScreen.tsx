@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -40,9 +40,15 @@ export default function ContentTypeBuilderScreen() {
   const [pendingPreview, setPendingPreview] = useState<ChangePreview | null>(null)
   const [conflict, setConflict] = useState<Conflict | null>(null)
   const [loadedVersion, setLoadedVersion] = useState<number | undefined>()
+  // Only sync form state from `existing` once. After that, this screen owns the fields —
+  // background refetches (e.g. real-time invalidation from someone else's edit) must not
+  // silently overwrite an in-progress edit or move the conflict-detection baseline out from
+  // under the user. "Reload latest version" explicitly opts back into a fresh sync.
+  const hasSyncedRef = useRef(false)
 
   useEffect(() => {
-    if (existing) {
+    if (existing && !hasSyncedRef.current) {
+      hasSyncedRef.current = true
       setName(existing.name)
       setSlug(existing.slug)
       setFields(existing.fields)
@@ -97,6 +103,7 @@ export default function ContentTypeBuilderScreen() {
 
   async function handleReloadLatest() {
     setConflict(null)
+    hasSyncedRef.current = false
     await refetchExisting()
   }
 
