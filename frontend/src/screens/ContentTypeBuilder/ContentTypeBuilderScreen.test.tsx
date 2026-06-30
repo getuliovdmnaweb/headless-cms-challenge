@@ -95,7 +95,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   })
 
   it('commits a non-risky change directly without showing the preview', async () => {
-    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [] })
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1 })
     vi.mocked(contentTypesService.commitContentTypeChange).mockResolvedValue({
       id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
     })
@@ -108,6 +108,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     await waitFor(() =>
       expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith(
         '1',
+        1,
         [{ id: 'f1', name: 'brand', type: 'text', required: true }],
         {}
       )
@@ -118,6 +119,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   it('shows the change preview for a risky change and commits with the chosen backfills on confirm', async () => {
     vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
       risky: true,
+      baseVersion: 1,
       impacts: [
         {
           fieldId: 'f1',
@@ -146,6 +148,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     await waitFor(() =>
       expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith(
         '1',
+        1,
         [{ id: 'f1', name: 'brand', type: 'text', required: true }],
         { f1: 'Unknown' }
       )
@@ -156,6 +159,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   it('leaves the content type untouched when the preview is cancelled', async () => {
     vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
       risky: true,
+      baseVersion: 1,
       impacts: [
         { fieldId: 'f1', fieldName: 'brand', changes: ['required-changed'], affectedCount: 1, autoMigratedCount: 0, needsAttention: [{ entryId: 'e1', currentValue: undefined }] },
       ],
@@ -171,5 +175,61 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
 
     expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
     expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
+  })
+
+  describe('mid-edit schema shift', () => {
+    it('shows a conflict message instead of navigating away when commit reports a version conflict', async () => {
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1 })
+      vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
+        new ApiError(409, {
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+          },
+        })
+      )
+
+      renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
+      expect(screen.queryByText('Content type list screen')).not.toBeInTheDocument()
+    })
+
+    it('reloads the latest fields when the user confirms after a conflict', async () => {
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1 })
+      vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
+        new ApiError(409, {
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+          },
+        })
+      )
+
+      renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+      await screen.findByText(/changed since you started editing/i)
+
+      vi.mocked(contentTypesService.getContentType).mockResolvedValue({
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Reload latest version' }))
+
+      await waitFor(() => expect(screen.getByPlaceholderText('Field name')).toHaveValue('make'))
+      expect(screen.queryByText(/changed since you started editing/i)).not.toBeInTheDocument()
+    })
   })
 })
