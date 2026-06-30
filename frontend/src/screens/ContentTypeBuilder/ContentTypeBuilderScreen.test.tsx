@@ -95,7 +95,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   })
 
   it('commits a non-risky change directly without showing the preview', async () => {
-    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1 })
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
     vi.mocked(contentTypesService.commitContentTypeChange).mockResolvedValue({
       id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
     })
@@ -120,6 +120,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
       risky: true,
       baseVersion: 1,
+      currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
       impacts: [
         {
           fieldId: 'f1',
@@ -160,6 +161,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
       risky: true,
       baseVersion: 1,
+      currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
       impacts: [
         { fieldId: 'f1', fieldName: 'brand', changes: ['required-changed'], affectedCount: 1, autoMigratedCount: 0, needsAttention: [{ entryId: 'e1', currentValue: undefined }] },
       ],
@@ -179,7 +181,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
 
   describe('mid-edit schema shift', () => {
     it('shows a conflict message instead of navigating away when commit reports a version conflict', async () => {
-      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1 })
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
       vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
         new ApiError(409, {
           error: {
@@ -200,7 +202,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     })
 
     it('reloads the latest fields when the user confirms after a conflict', async () => {
-      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1 })
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
       vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
         new ApiError(409, {
           error: {
@@ -230,6 +232,27 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
 
       await waitFor(() => expect(screen.getByPlaceholderText('Field name')).toHaveValue('make'))
       expect(screen.queryByText(/changed since you started editing/i)).not.toBeInTheDocument()
+    })
+
+    it('detects a conflict from the preview response itself, before ever showing an impact preview based on stale fields', async () => {
+      // The content type was at version 1 when this screen loaded (see outer beforeEach), but by the
+      // time preview-change runs, someone else has already moved it to version 2 — preview-change always
+      // reflects the live current state, so it comes back as baseVersion 2 with the new current fields.
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
+        risky: false,
+        impacts: [],
+        baseVersion: 2,
+        currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+      })
+
+      renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
+      expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
+      expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
     })
   })
 })

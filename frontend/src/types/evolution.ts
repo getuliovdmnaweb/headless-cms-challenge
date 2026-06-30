@@ -1,3 +1,5 @@
+import type { FieldDefinition } from './contentType'
+
 export type FieldChangeType =
   | 'added'
   | 'deleted'
@@ -24,4 +26,5 @@ export interface ChangePreview {
   risky: boolean
   impacts: FieldImpact[]
   baseVersion: number
+  currentFields: FieldDefinition[]
 }
