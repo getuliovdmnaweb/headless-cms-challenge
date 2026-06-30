@@ -9,7 +9,7 @@ vi.mock('../../services/contentTypes')
 
 function renderScreen(initialPath: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const utils = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -20,13 +20,14 @@ function renderScreen(initialPath: string) {
       </MemoryRouter>
     </QueryClientProvider>
   )
+  return { ...utils, queryClient }
 }
 
 beforeEach(() => {
   vi.mocked(contentTypesService.getContentTypes).mockResolvedValue([])
 })
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => vi.resetAllMocks())
 
 describe('ContentTypeBuilderScreen — create mode', () => {
   it('auto-derives the slug from the name', async () => {
@@ -253,6 +254,44 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
       expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
       expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
       expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
+    })
+
+    it('does not let a background refetch (e.g. from realtime sync) silently overwrite an in-progress edit or hide a real conflict', async () => {
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
+        risky: false,
+        impacts: [],
+        baseVersion: 2,
+        currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+      })
+
+      const { queryClient } = renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      // The user starts editing locally.
+      fireEvent.change(screen.getByPlaceholderText('Field name'), { target: { value: 'model' } })
+
+      // Meanwhile, realtime sync (or any other background refetch) silently updates the cached
+      // content type to reflect someone else's concurrent commit — this must not clobber the
+      // user's in-progress edit, and must not quietly move the baseline the conflict check uses.
+      queryClient.setQueryData(['contentTypes', '1'], {
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+
+      // Let any background re-sync triggered by the cache update fully settle, then save.
+      // The assertions below are the real proof this isn't clobbered: if the background update
+      // had silently overwritten the user's edit and the loaded-version baseline, this save would
+      // either commit the wrong fields or fail to detect the conflict at all.
+      fireEvent.click(await screen.findByRole('button', { name: 'Save changes' }))
+
+      expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
+      expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
+      expect(screen.getByPlaceholderText('Field name')).toHaveValue('model')
     })
   })
 })
