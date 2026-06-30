@@ -52,6 +52,26 @@ describe('listEntries', () => {
 
     expect(await listEntries(car.id, car.fields)).toHaveLength(1);
   });
+
+  it('flags an entry as invalid when its reference field points to an entry that no longer exists', async () => {
+    const person = await createContentType({ name: 'Person', fields: [] });
+    const personEntry = await createEntry(person.id, person.version, {});
+    const car = await createContentType({
+      name: 'Car',
+      fields: [{ id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: person.id }],
+    });
+    const carEntry = await createEntry(car.id, car.version, { owner: personEntry.id });
+
+    const beforeDelete = await listEntries(car.id, car.fields);
+    expect(beforeDelete.find((e) => e.id === carEntry.id)?.isValid).toBe(true);
+
+    await deleteEntry(person.id, personEntry.id);
+
+    const afterDelete = await listEntries(car.id, car.fields);
+    const flagged = afterDelete.find((e) => e.id === carEntry.id);
+    expect(flagged?.isValid).toBe(false);
+    expect(flagged?.errors).toEqual([{ field: 'owner', reason: 'reference' }]);
+  });
 });
 
 describe('getEntry', () => {
@@ -65,6 +85,20 @@ describe('getEntry', () => {
     const created = await createEntry(car.id, car.version, { brand: 'Toyota' });
     const found = await getEntry(car.id, created.id, car.fields);
     expect(found?.isValid).toBe(true);
+  });
+
+  it('flags a broken reference as invalid', async () => {
+    const person = await createContentType({ name: 'Person', fields: [] });
+    const car = await createContentType({
+      name: 'Car',
+      fields: [{ id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: person.id }],
+    });
+    const created = await createEntry(car.id, car.version, { owner: '00000000-0000-0000-0000-000000000000' });
+
+    const found = await getEntry(car.id, created.id, car.fields);
+
+    expect(found?.isValid).toBe(false);
+    expect(found?.errors).toEqual([{ field: 'owner', reason: 'reference' }]);
   });
 });
 
