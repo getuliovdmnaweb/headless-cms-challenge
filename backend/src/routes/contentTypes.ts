@@ -77,15 +77,31 @@ contentTypesRouter.post('/:id/preview-change', async (req, res) => {
   const entries = await listEntries(contentType.id, contentType.fields);
   const impacts = await classifyImpact(diffs, entries, entryExists);
 
-  res.json({ risky: isRiskyChange(diffs), impacts });
+  res.json({ risky: isRiskyChange(diffs), impacts, baseVersion: contentType.version });
 });
 
 contentTypesRouter.post('/:id/commit-change', async (req, res) => {
+  if (typeof req.body.baseVersion !== 'number') {
+    return res.status(400).json({ error: { message: 'baseVersion is required' } });
+  }
+
   const newFields = req.body.fields ?? [];
   const backfills = req.body.backfills ?? {};
 
-  const result = await commitContentTypeChange(req.params.id, newFields, backfills);
-  if (!result) return res.status(404).json({ error: { message: 'Content type not found' } });
+  const result = await commitContentTypeChange(req.params.id, req.body.baseVersion, newFields, backfills);
+
+  if (result.status === 'not-found') {
+    return res.status(404).json({ error: { message: 'Content type not found' } });
+  }
+  if (result.status === 'conflict') {
+    return res.status(409).json({
+      error: {
+        message: 'This content type changed since you started editing — review the latest version and try again.',
+        currentVersion: result.currentVersion,
+        currentFields: result.currentFields,
+      },
+    });
+  }
 
   res.json(result.contentType);
   emit('contentType:updated', { contentTypeId: result.contentType.id });
