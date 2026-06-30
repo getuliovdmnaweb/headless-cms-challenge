@@ -4,10 +4,10 @@ import { diffFields } from '../validator/diffFields';
 import { migrateEntryData } from '../validator/migrateEntryData';
 import type { ContentType, FieldDefinition } from './contentTypes';
 
-export interface CommitResult {
-  contentType: ContentType;
-  migratedEntryIds: string[];
-}
+export type CommitOutcome =
+  | { status: 'committed'; contentType: ContentType; migratedEntryIds: string[] }
+  | { status: 'not-found' }
+  | { status: 'conflict'; currentVersion: number; currentFields: FieldDefinition[] };
 
 function toContentType(row: any): ContentType {
   return {
@@ -23,9 +23,10 @@ function toContentType(row: any): ContentType {
 
 export async function commitContentTypeChange(
   contentTypeId: string,
+  baseVersion: number,
   newFields: FieldDefinition[],
   backfillByFieldId: Record<string, unknown>
-): Promise<CommitResult | null> {
+): Promise<CommitOutcome> {
   const client: PoolClient = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -36,9 +37,15 @@ export async function commitContentTypeChange(
     );
     if (!currentResult.rows[0]) {
       await client.query('ROLLBACK');
-      return null;
+      return { status: 'not-found' };
     }
     const current = toContentType(currentResult.rows[0]);
+
+    if (current.version !== baseVersion) {
+      await client.query('ROLLBACK');
+      return { status: 'conflict', currentVersion: current.version, currentFields: current.fields };
+    }
+
     const diffs = diffFields(current.fields, newFields);
 
     const checkEntryExists = async (targetContentTypeId: string, entryId: string): Promise<boolean> => {
@@ -70,7 +77,7 @@ export async function commitContentTypeChange(
     }
 
     await client.query('COMMIT');
-    return { contentType: updated, migratedEntryIds };
+    return { status: 'committed', contentType: updated, migratedEntryIds };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

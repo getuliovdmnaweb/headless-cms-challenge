@@ -119,6 +119,7 @@ describe('POST /api/content-types/:id/preview-change', () => {
     expect(res.status).toBe(200);
     expect(res.body.risky).toBe(false);
     expect(res.body.impacts).toEqual([]);
+    expect(res.body.baseVersion).toBe(1);
   });
 
   it('returns risky: true with classified impacts for a risky change, without writing anything', async () => {
@@ -179,7 +180,7 @@ describe('POST /api/content-types/:id/commit-change', () => {
 
     const res = await request(app)
       .post(`/api/content-types/${created.body.id}/commit-change`)
-      .send({ fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
+      .send({ baseVersion: 1, fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
 
     expect(res.status).toBe(200);
     expect(res.body.version).toBe(2);
@@ -194,7 +195,7 @@ describe('POST /api/content-types/:id/commit-change', () => {
 
     await request(app)
       .post(`/api/content-types/${created.body.id}/commit-change`)
-      .send({ fields: [{ id: 'f1', name: 'year', type: 'number', required: false }], backfills: { f1: 1999 } });
+      .send({ baseVersion: 1, fields: [{ id: 'f1', name: 'year', type: 'number', required: false }], backfills: { f1: 1999 } });
 
     const migrated = await request(app).get(`/api/content-types/${created.body.id}/entries/${entry.body.id}`);
     expect(migrated.body.data).toEqual({ year: 1999 });
@@ -211,7 +212,7 @@ describe('POST /api/content-types/:id/commit-change', () => {
     const entryEvent = waitForEvent('entry:updated');
     await request(app)
       .post(`/api/content-types/${created.body.id}/commit-change`)
-      .send({ fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
+      .send({ baseVersion: 1, fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
 
     expect(await contentTypeEvent).toEqual({ contentTypeId: created.body.id });
     expect(await entryEvent).toEqual({ contentTypeId: created.body.id, entryId: entry.body.id });
@@ -220,8 +221,34 @@ describe('POST /api/content-types/:id/commit-change', () => {
   it('returns 404 for an unknown content type', async () => {
     const res = await request(app)
       .post('/api/content-types/00000000-0000-0000-0000-000000000000/commit-change')
-      .send({ fields: [] });
+      .send({ baseVersion: 1, fields: [] });
     expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when baseVersion is missing', async () => {
+    const created = await request(app).post('/api/content-types').send({ name: 'Car', fields: [] });
+    const res = await request(app).post(`/api/content-types/${created.body.id}/commit-change`).send({ fields: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 409 with the current state when the content type changed since the client loaded it', async () => {
+    const created = await request(app)
+      .post('/api/content-types')
+      .send({ name: 'Car', fields: [{ id: 'f1', name: 'brand', type: 'text', required: false }] });
+
+    // Someone else commits first.
+    await request(app)
+      .post(`/api/content-types/${created.body.id}/commit-change`)
+      .send({ baseVersion: 1, fields: [{ id: 'f1', name: 'make', type: 'text', required: false }] });
+
+    // A client still holding the stale version 1 tries to commit on top of it.
+    const res = await request(app)
+      .post(`/api/content-types/${created.body.id}/commit-change`)
+      .send({ baseVersion: 1, fields: [{ id: 'f1', name: 'brand', type: 'number', required: false }] });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.currentVersion).toBe(2);
+    expect(res.body.error.currentFields).toEqual([{ id: 'f1', name: 'make', type: 'text', required: false }]);
   });
 });
 
