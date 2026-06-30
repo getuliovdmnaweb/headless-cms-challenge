@@ -77,7 +77,7 @@ contentTypesRouter.post('/:id/preview-change', async (req, res) => {
   const entries = await listEntries(contentType.id, contentType.fields);
   const impacts = await classifyImpact(diffs, entries, entryExists);
 
-  res.json({ risky: isRiskyChange(diffs), impacts, baseVersion: contentType.version });
+  res.json({ risky: isRiskyChange(diffs), impacts, baseVersion: contentType.version, currentFields: contentType.fields });
 });
 
 contentTypesRouter.post('/:id/commit-change', async (req, res) => {
