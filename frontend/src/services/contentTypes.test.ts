@@ -53,11 +53,11 @@ describe('contentTypes service', () => {
     })
   })
 
-  it('commits a content type change with backfills', async () => {
-    await commitContentTypeChange('1', [], { f1: 1999 })
+  it('commits a content type change with the base version and backfills', async () => {
+    await commitContentTypeChange('1', 2, [], { f1: 1999 })
     expect(apiFetch).toHaveBeenCalledWith('/api/content-types/1/commit-change', {
       method: 'POST',
-      body: JSON.stringify({ fields: [], backfills: { f1: 1999 } }),
+      body: JSON.stringify({ baseVersion: 2, fields: [], backfills: { f1: 1999 } }),
     })
   })
 })

@@ -1,4 +1,10 @@
-export type FieldChangeType = 'added' | 'deleted' | 'renamed' | 'type-changed' | 'required-changed'
+export type FieldChangeType =
+  | 'added'
+  | 'deleted'
+  | 'renamed'
+  | 'type-changed'
+  | 'required-changed'
+  | 'reference-target-changed'
 
 export interface NeedsAttentionEntry {
   entryId: string
@@ -17,4 +23,5 @@ export interface FieldImpact {
 export interface ChangePreview {
   risky: boolean
   impacts: FieldImpact[]
+  baseVersion: number
 }
