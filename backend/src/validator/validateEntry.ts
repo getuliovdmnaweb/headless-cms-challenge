@@ -63,3 +63,18 @@ export function validateEntry(fields: FieldDefinition[], data: Record<string, un
 
   return errors;
 }
+
+export async function validateEntryAsync(
+  fields: FieldDefinition[],
+  data: Record<string, unknown>,
+  entryExists: EntryExistsChecker
+): Promise<ValidationError[]> {
+  const errors: ValidationError[] = [];
+
+  for (const field of fields) {
+    const error = await validateFieldAsync(field, data[field.name], entryExists);
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
