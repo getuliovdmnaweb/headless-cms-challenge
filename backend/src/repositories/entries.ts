@@ -1,6 +1,6 @@
 import { pool } from '../db';
 import type { FieldDefinition } from './contentTypes';
-import { validateEntry, type ValidationError } from '../validator/validateEntry';
+import { validateEntryAsync, type ValidationError } from '../validator/validateEntry';
 
 export interface Entry {
   id: string;
@@ -27,8 +27,8 @@ function toEntry(row: any): Entry {
   };
 }
 
-function annotate(entry: Entry, fields: FieldDefinition[]): EntryWithValidity {
-  const errors = validateEntry(fields, entry.data);
+async function annotate(entry: Entry, fields: FieldDefinition[]): Promise<EntryWithValidity> {
+  const errors = await validateEntryAsync(fields, entry.data, entryExists);
   return { ...entry, isValid: errors.length === 0, errors };
 }
 
@@ -51,7 +51,7 @@ export async function listEntries(contentTypeId: string, fields: FieldDefinition
      FROM entries WHERE content_type_id = $1 ORDER BY created_at DESC`,
     [contentTypeId]
   );
-  return result.rows.map((row) => annotate(toEntry(row), fields));
+  return Promise.all(result.rows.map((row) => annotate(toEntry(row), fields)));
 }
 
 export async function getEntry(
