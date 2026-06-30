@@ -103,8 +103,19 @@ export default function ContentTypeBuilderScreen() {
 
   async function handleReloadLatest() {
     setConflict(null)
-    hasSyncedRef.current = false
-    await refetchExisting()
+    const result = await refetchExisting()
+    // Read straight from the refetch result rather than relying on the sync effect: if a
+    // background refetch (e.g. realtime invalidation) already wrote this exact data into the
+    // cache before this reload ran, TanStack Query's structural sharing keeps the same `data`
+    // reference, so an effect keyed on `[existing]` would never re-fire.
+    if (result.data) {
+      hasSyncedRef.current = true
+      setName(result.data.name)
+      setSlug(result.data.slug)
+      setFields(result.data.fields)
+      setSlugTouched(true)
+      setLoadedVersion(result.data.version)
+    }
   }
 
   async function handleSubmit() {
