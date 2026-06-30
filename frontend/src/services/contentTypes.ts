@@ -28,11 +28,12 @@ export function previewContentTypeChange(id: string, fields: FieldDefinition[]):
 
 export function commitContentTypeChange(
   id: string,
+  baseVersion: number,
   fields: FieldDefinition[],
   backfills: Record<string, unknown>
 ): Promise<ContentType> {
   return apiFetch(`/api/content-types/${id}/commit-change`, {
     method: 'POST',
-    body: JSON.stringify({ fields, backfills }),
+    body: JSON.stringify({ baseVersion, fields, backfills }),
   })
 }
