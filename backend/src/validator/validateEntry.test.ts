@@ -1,5 +1,5 @@
 import type { FieldDefinition } from '../repositories/contentTypes';
-import { validateEntry, validateField, validateFieldAsync } from './validateEntry';
+import { validateEntry, validateEntryAsync, validateField, validateFieldAsync } from './validateEntry';
 
 const alwaysExists = async () => true;
 const neverExists = async () => false;
@@ -112,5 +112,27 @@ describe('validateEntry', () => {
       { field: 'brand', reason: 'required' },
       { field: 'year', reason: 'type' },
     ]);
+  });
+});
+
+describe('validateEntryAsync', () => {
+  it('reports a broken reference alongside other sync errors', async () => {
+    const fields: FieldDefinition[] = [
+      { id: 'f1', name: 'brand', type: 'text', required: true },
+      { id: 'f2', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' },
+    ];
+    const errors = await validateEntryAsync(fields, { owner: 'p1' }, async () => false);
+    expect(errors).toEqual([
+      { field: 'brand', reason: 'required' },
+      { field: 'owner', reason: 'reference' },
+    ]);
+  });
+
+  it('returns no errors when the reference exists and everything else is valid', async () => {
+    const fields: FieldDefinition[] = [
+      { id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' },
+    ];
+    const errors = await validateEntryAsync(fields, { owner: 'p1' }, async () => true);
+    expect(errors).toEqual([]);
   });
 });

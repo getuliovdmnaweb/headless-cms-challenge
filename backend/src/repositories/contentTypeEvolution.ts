@@ -41,6 +41,14 @@ export async function commitContentTypeChange(
     const current = toContentType(currentResult.rows[0]);
     const diffs = diffFields(current.fields, newFields);
 
+    const checkEntryExists = async (targetContentTypeId: string, entryId: string): Promise<boolean> => {
+      const result = await client.query('SELECT 1 FROM entries WHERE content_type_id = $1 AND id = $2', [
+        targetContentTypeId,
+        entryId,
+      ]);
+      return (result.rowCount ?? 0) > 0;
+    };
+
     const updatedResult = await client.query(
       `UPDATE content_types SET fields = $2, version = version + 1, updated_at = now() WHERE id = $1
        RETURNING id, name, slug, version, fields, created_at, updated_at`,
@@ -52,7 +60,7 @@ export async function commitContentTypeChange(
 
     const migratedEntryIds: string[] = [];
     for (const row of entriesResult.rows) {
-      const migratedData = migrateEntryData(diffs, row.data, backfillByFieldId);
+      const migratedData = await migrateEntryData(diffs, row.data, backfillByFieldId, checkEntryExists);
       await client.query(`UPDATE entries SET data = $2, content_type_version = $3, updated_at = now() WHERE id = $1`, [
         row.id,
         JSON.stringify(migratedData),
