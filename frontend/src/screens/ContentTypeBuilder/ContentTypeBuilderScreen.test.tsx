@@ -235,6 +235,59 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
       expect(screen.queryByText(/changed since you started editing/i)).not.toBeInTheDocument()
     })
 
+    it('reloads the latest fields even when realtime sync already wrote that exact data into the cache before the reload', async () => {
+      // Reproduces a real bug: if a background refetch (e.g. realtime invalidation) already
+      // populated the query cache with the latest data before the user clicks "Reload latest
+      // version", TanStack Query's structural sharing keeps the same `data` object reference
+      // when the explicit refetch resolves with value-identical data — so an effect keyed on
+      // `[existing]` never re-fires and the form stays stuck on the old local edit.
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
+      vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
+        new ApiError(409, {
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+          },
+        })
+      )
+
+      const { queryClient } = renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      // Simulate realtime sync already having refreshed the cache with the latest server state
+      // before the user ever clicks save.
+      queryClient.setQueryData(['contentTypes', '1'], {
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+      await screen.findByText(/changed since you started editing/i)
+
+      // The explicit reload's refetch resolves with data that is value-identical to what's
+      // already cached above — this is what triggers structural sharing to preserve the old
+      // object reference.
+      vi.mocked(contentTypesService.getContentType).mockResolvedValue({
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Reload latest version' }))
+
+      await waitFor(() => expect(screen.getByPlaceholderText('Field name')).toHaveValue('make'))
+      expect(screen.queryByText(/changed since you started editing/i)).not.toBeInTheDocument()
+    })
+
     it('detects a conflict from the preview response itself, before ever showing an impact preview based on stale fields', async () => {
       // The content type was at version 1 when this screen loaded (see outer beforeEach), but by the
       // time preview-change runs, someone else has already moved it to version 2 — preview-change always
