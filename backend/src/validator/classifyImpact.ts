@@ -1,4 +1,4 @@
-import { validateField } from './validateEntry';
+import { validateFieldAsync, type EntryExistsChecker } from './validateEntry';
 import type { FieldDiff } from './diffFields';
 
 export interface ImpactEntry {
@@ -24,7 +24,11 @@ function isPresent(value: unknown): boolean {
   return value !== undefined && value !== null && !(typeof value === 'string' && value.trim() === '');
 }
 
-export function classifyImpact(diffs: FieldDiff[], entries: ImpactEntry[]): FieldImpact[] {
+export async function classifyImpact(
+  diffs: FieldDiff[],
+  entries: ImpactEntry[],
+  entryExists: EntryExistsChecker
+): Promise<FieldImpact[]> {
   const impacts: FieldImpact[] = [];
 
   for (const diff of diffs) {
@@ -39,7 +43,10 @@ export function classifyImpact(diffs: FieldDiff[], entries: ImpactEntry[]): Fiel
       continue;
     }
 
-    const checksValueValidity = diff.changes.includes('type-changed') || diff.changes.includes('required-changed');
+    const checksValueValidity =
+      diff.changes.includes('type-changed') ||
+      diff.changes.includes('required-changed') ||
+      diff.changes.includes('reference-target-changed');
 
     if (!checksValueValidity) {
       const affectedCount = entries.filter((entry) => isPresent(entry.data[readKey])).length;
@@ -51,7 +58,7 @@ export function classifyImpact(diffs: FieldDiff[], entries: ImpactEntry[]): Fiel
     const needsAttention: NeedsAttentionEntry[] = [];
     for (const entry of entries) {
       const value = entry.data[readKey];
-      const error = validateField(diff.newField!, value);
+      const error = await validateFieldAsync(diff.newField!, value, entryExists);
       if (error) {
         needsAttention.push({ entryId: entry.id, currentValue: value });
       } else {

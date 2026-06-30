@@ -145,6 +145,29 @@ describe('POST /api/content-types/:id/preview-change', () => {
       .send({ fields: [] });
     expect(res.status).toBe(404);
   });
+
+  it('flags entries whose reference no longer exists when a reference field changes target', async () => {
+    const person = await request(app).post('/api/content-types').send({ name: 'Person', fields: [] });
+    const personEntry = await request(app).post(`/api/content-types/${person.body.id}/entries`).send({ data: {} });
+    const company = await request(app).post('/api/content-types').send({ name: 'Company', fields: [] });
+
+    const car = await request(app)
+      .post('/api/content-types')
+      .send({
+        name: 'Car',
+        fields: [{ id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: person.body.id }],
+      });
+    await request(app).post(`/api/content-types/${car.body.id}/entries`).send({ data: { owner: personEntry.body.id } });
+
+    const res = await request(app)
+      .post(`/api/content-types/${car.body.id}/preview-change`)
+      .send({ fields: [{ id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: company.body.id }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.risky).toBe(true);
+    expect(res.body.impacts[0].changes).toEqual(['reference-target-changed']);
+    expect(res.body.impacts[0].needsAttention).toEqual([{ entryId: expect.any(String), currentValue: personEntry.body.id }]);
+  });
 });
 
 describe('POST /api/content-types/:id/commit-change', () => {

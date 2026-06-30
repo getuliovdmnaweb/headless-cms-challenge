@@ -8,7 +8,7 @@ import {
   updateContentTypeFields,
 } from '../repositories/contentTypes';
 import { commitContentTypeChange } from '../repositories/contentTypeEvolution';
-import { listEntries } from '../repositories/entries';
+import { entryExists, listEntries } from '../repositories/entries';
 import { emit } from '../realtime/bus';
 import { classifyImpact } from '../validator/classifyImpact';
 import { diffFields, isRiskyChange } from '../validator/diffFields';
@@ -75,7 +75,7 @@ contentTypesRouter.post('/:id/preview-change', async (req, res) => {
   const newFields = req.body.fields ?? [];
   const diffs = diffFields(contentType.fields, newFields);
   const entries = await listEntries(contentType.id, contentType.fields);
-  const impacts = classifyImpact(diffs, entries);
+  const impacts = await classifyImpact(diffs, entries, entryExists);
 
   res.json({ risky: isRiskyChange(diffs), impacts });
 });
