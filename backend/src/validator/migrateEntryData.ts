@@ -1,4 +1,4 @@
-import { validateField } from './validateEntry';
+import { validateFieldAsync, type EntryExistsChecker } from './validateEntry';
 import type { FieldDiff } from './diffFields';
 import type { FieldDefinition } from '../repositories/contentTypes';
 
@@ -19,11 +19,12 @@ function coerceToFieldType(field: FieldDefinition, value: unknown): unknown {
   }
 }
 
-export function migrateEntryData(
+export async function migrateEntryData(
   diffs: FieldDiff[],
   data: Record<string, unknown>,
-  backfillByFieldId: Record<string, unknown>
-): Record<string, unknown> {
+  backfillByFieldId: Record<string, unknown>,
+  entryExists: EntryExistsChecker
+): Promise<Record<string, unknown>> {
   const result = { ...data };
 
   for (const diff of diffs) {
@@ -36,9 +37,14 @@ export function migrateEntryData(
     if (diff.changes.includes('deleted')) continue;
 
     const writeKey = diff.newField!.name;
-    const needsCheck = diff.changes.includes('type-changed') || diff.changes.includes('required-changed');
+    const needsCheck =
+      diff.changes.includes('type-changed') ||
+      diff.changes.includes('required-changed') ||
+      diff.changes.includes('reference-target-changed');
 
-    if (needsCheck && validateField(diff.newField!, value) && diff.fieldId in backfillByFieldId) {
+    const error = needsCheck ? await validateFieldAsync(diff.newField!, value, entryExists) : null;
+
+    if (error && diff.fieldId in backfillByFieldId) {
       result[writeKey] = coerceToFieldType(diff.newField!, backfillByFieldId[diff.fieldId]);
     } else {
       result[writeKey] = value;

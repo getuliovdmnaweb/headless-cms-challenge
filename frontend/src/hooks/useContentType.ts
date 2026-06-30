@@ -30,8 +30,15 @@ export function usePreviewContentTypeChange(id: string) {
 export function useCommitContentTypeChange(id: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ fields, backfills }: { fields: FieldDefinition[]; backfills: Record<string, unknown> }) =>
-      commitContentTypeChange(id, fields, backfills),
+    mutationFn: ({
+      baseVersion,
+      fields,
+      backfills,
+    }: {
+      baseVersion: number
+      fields: FieldDefinition[]
+      backfills: Record<string, unknown>
+    }) => commitContentTypeChange(id, baseVersion, fields, backfills),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contentTypes', id] })
       queryClient.invalidateQueries({ queryKey: ['contentTypes'] })

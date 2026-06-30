@@ -56,6 +56,20 @@ describe('diffFields', () => {
     expect(diffs[0].changes).toEqual(['renamed', 'type-changed']);
   });
 
+  it('detects a reference field changing its target content type', () => {
+    const oldField: FieldDefinition = { id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' };
+    const newField: FieldDefinition = { id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'company' };
+    const diffs = diffFields([oldField], [newField]);
+    expect(diffs[0].changes).toEqual(['reference-target-changed']);
+  });
+
+  it('does not flag a reference target change for non-reference fields (no referenceContentTypeId set)', () => {
+    const oldField: FieldDefinition = { id: 'f1', name: 'brand', type: 'text', required: false };
+    const newField: FieldDefinition = { id: 'f1', name: 'brand', type: 'text', required: false };
+    const diffs = diffFields([oldField], [newField]);
+    expect(diffs[0].changes).toEqual([]);
+  });
+
   it('preserves field order, with deleted fields ordered before any newly added fields', () => {
     const a: FieldDefinition = { id: 'a', name: 'a', type: 'text', required: false };
     const b: FieldDefinition = { id: 'b', name: 'b', type: 'text', required: false };
@@ -66,7 +80,7 @@ describe('diffFields', () => {
 });
 
 describe('isRiskyChange', () => {
-  it.each([['deleted'], ['renamed'], ['type-changed'], ['required-changed']] as const)(
+  it.each([['deleted'], ['renamed'], ['type-changed'], ['required-changed'], ['reference-target-changed']] as const)(
     'is risky when a field has a %s change',
     (change) => {
       expect(isRiskyChange([{ fieldId: 'f1', changes: [change] }])).toBe(true);

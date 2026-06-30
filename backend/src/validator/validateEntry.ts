@@ -35,11 +35,44 @@ export function validateField(field: FieldDefinition, value: unknown): Validatio
   return null;
 }
 
+export type EntryExistsChecker = (contentTypeId: string, entryId: string) => Promise<boolean>;
+
+export async function validateFieldAsync(
+  field: FieldDefinition,
+  value: unknown,
+  entryExists: EntryExistsChecker
+): Promise<ValidationError | null> {
+  const syncError = validateField(field, value);
+  if (syncError) return syncError;
+
+  if (field.type === 'reference' && field.referenceContentTypeId && !isEmpty(value)) {
+    const exists = await entryExists(field.referenceContentTypeId, String(value));
+    if (!exists) return { field: field.name, reason: 'reference' };
+  }
+
+  return null;
+}
+
 export function validateEntry(fields: FieldDefinition[], data: Record<string, unknown>): ValidationError[] {
   const errors: ValidationError[] = [];
 
   for (const field of fields) {
     const error = validateField(field, data[field.name]);
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
+
+export async function validateEntryAsync(
+  fields: FieldDefinition[],
+  data: Record<string, unknown>,
+  entryExists: EntryExistsChecker
+): Promise<ValidationError[]> {
+  const errors: ValidationError[] = [];
+
+  for (const field of fields) {
+    const error = await validateFieldAsync(field, data[field.name], entryExists);
     if (error) errors.push(error);
   }
 

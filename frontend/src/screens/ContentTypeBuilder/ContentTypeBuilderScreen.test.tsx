@@ -9,7 +9,7 @@ vi.mock('../../services/contentTypes')
 
 function renderScreen(initialPath: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const utils = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -20,13 +20,14 @@ function renderScreen(initialPath: string) {
       </MemoryRouter>
     </QueryClientProvider>
   )
+  return { ...utils, queryClient }
 }
 
 beforeEach(() => {
   vi.mocked(contentTypesService.getContentTypes).mockResolvedValue([])
 })
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => vi.resetAllMocks())
 
 describe('ContentTypeBuilderScreen — create mode', () => {
   it('auto-derives the slug from the name', async () => {
@@ -95,7 +96,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   })
 
   it('commits a non-risky change directly without showing the preview', async () => {
-    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [] })
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
     vi.mocked(contentTypesService.commitContentTypeChange).mockResolvedValue({
       id: '1', name: 'Car', slug: 'car', version: 2, fields: [], createdAt: '', updatedAt: '',
     })
@@ -108,6 +109,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     await waitFor(() =>
       expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith(
         '1',
+        1,
         [{ id: 'f1', name: 'brand', type: 'text', required: true }],
         {}
       )
@@ -118,6 +120,8 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   it('shows the change preview for a risky change and commits with the chosen backfills on confirm', async () => {
     vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
       risky: true,
+      baseVersion: 1,
+      currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
       impacts: [
         {
           fieldId: 'f1',
@@ -146,6 +150,7 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
     await waitFor(() =>
       expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith(
         '1',
+        1,
         [{ id: 'f1', name: 'brand', type: 'text', required: true }],
         { f1: 'Unknown' }
       )
@@ -156,6 +161,8 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
   it('leaves the content type untouched when the preview is cancelled', async () => {
     vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
       risky: true,
+      baseVersion: 1,
+      currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
       impacts: [
         { fieldId: 'f1', fieldName: 'brand', changes: ['required-changed'], affectedCount: 1, autoMigratedCount: 0, needsAttention: [{ entryId: 'e1', currentValue: undefined }] },
       ],
@@ -171,5 +178,173 @@ describe('ContentTypeBuilderScreen — edit mode', () => {
 
     expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
     expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
+  })
+
+  describe('mid-edit schema shift', () => {
+    it('shows a conflict message instead of navigating away when commit reports a version conflict', async () => {
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
+      vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
+        new ApiError(409, {
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+          },
+        })
+      )
+
+      renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
+      expect(screen.queryByText('Content type list screen')).not.toBeInTheDocument()
+    })
+
+    it('reloads the latest fields when the user confirms after a conflict', async () => {
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
+      vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
+        new ApiError(409, {
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+          },
+        })
+      )
+
+      renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+      await screen.findByText(/changed since you started editing/i)
+
+      vi.mocked(contentTypesService.getContentType).mockResolvedValue({
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Reload latest version' }))
+
+      await waitFor(() => expect(screen.getByPlaceholderText('Field name')).toHaveValue('make'))
+      expect(screen.queryByText(/changed since you started editing/i)).not.toBeInTheDocument()
+    })
+
+    it('reloads the latest fields even when realtime sync already wrote that exact data into the cache before the reload', async () => {
+      // Reproduces a real bug: if a background refetch (e.g. realtime invalidation) already
+      // populated the query cache with the latest data before the user clicks "Reload latest
+      // version", TanStack Query's structural sharing keeps the same `data` object reference
+      // when the explicit refetch resolves with value-identical data — so an effect keyed on
+      // `[existing]` never re-fires and the form stays stuck on the old local edit.
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: false, impacts: [], baseVersion: 1, currentFields: [] })
+      vi.mocked(contentTypesService.commitContentTypeChange).mockRejectedValue(
+        new ApiError(409, {
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+          },
+        })
+      )
+
+      const { queryClient } = renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      // Simulate realtime sync already having refreshed the cache with the latest server state
+      // before the user ever clicks save.
+      queryClient.setQueryData(['contentTypes', '1'], {
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+      await screen.findByText(/changed since you started editing/i)
+
+      // The explicit reload's refetch resolves with data that is value-identical to what's
+      // already cached above — this is what triggers structural sharing to preserve the old
+      // object reference.
+      vi.mocked(contentTypesService.getContentType).mockResolvedValue({
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'make', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Reload latest version' }))
+
+      await waitFor(() => expect(screen.getByPlaceholderText('Field name')).toHaveValue('make'))
+      expect(screen.queryByText(/changed since you started editing/i)).not.toBeInTheDocument()
+    })
+
+    it('detects a conflict from the preview response itself, before ever showing an impact preview based on stale fields', async () => {
+      // The content type was at version 1 when this screen loaded (see outer beforeEach), but by the
+      // time preview-change runs, someone else has already moved it to version 2 — preview-change always
+      // reflects the live current state, so it comes back as baseVersion 2 with the new current fields.
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
+        risky: false,
+        impacts: [],
+        baseVersion: 2,
+        currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+      })
+
+      renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
+      expect(screen.queryByText('Review content type change')).not.toBeInTheDocument()
+      expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
+    })
+
+    it('does not let a background refetch (e.g. from realtime sync) silently overwrite an in-progress edit or hide a real conflict', async () => {
+      vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({
+        risky: false,
+        impacts: [],
+        baseVersion: 2,
+        currentFields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+      })
+
+      const { queryClient } = renderScreen('/content-types/1/edit')
+      await waitFor(() => expect(screen.getByPlaceholderText('Name')).toHaveValue('Car'))
+
+      // The user starts editing locally.
+      fireEvent.change(screen.getByPlaceholderText('Field name'), { target: { value: 'model' } })
+
+      // Meanwhile, realtime sync (or any other background refetch) silently updates the cached
+      // content type to reflect someone else's concurrent commit — this must not clobber the
+      // user's in-progress edit, and must not quietly move the baseline the conflict check uses.
+      queryClient.setQueryData(['contentTypes', '1'], {
+        id: '1',
+        name: 'Car',
+        slug: 'car',
+        version: 2,
+        fields: [{ id: 'f1', name: 'brand', type: 'text', required: true }],
+        createdAt: '',
+        updatedAt: '',
+      })
+
+      // Let any background re-sync triggered by the cache update fully settle, then save.
+      // The assertions below are the real proof this isn't clobbered: if the background update
+      // had silently overwritten the user's edit and the loaded-version baseline, this save would
+      // either commit the wrong fields or fail to detect the conflict at all.
+      fireEvent.click(await screen.findByRole('button', { name: 'Save changes' }))
+
+      expect(await screen.findByText(/changed since you started editing/i)).toBeInTheDocument()
+      expect(contentTypesService.commitContentTypeChange).not.toHaveBeenCalled()
+      expect(screen.getByPlaceholderText('Field name')).toHaveValue('model')
+    })
   })
 })

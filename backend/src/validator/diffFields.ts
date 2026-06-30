@@ -1,6 +1,12 @@
 import type { FieldDefinition } from '../repositories/contentTypes';
 
-export type FieldChangeType = 'added' | 'deleted' | 'renamed' | 'type-changed' | 'required-changed';
+export type FieldChangeType =
+  | 'added'
+  | 'deleted'
+  | 'renamed'
+  | 'type-changed'
+  | 'required-changed'
+  | 'reference-target-changed';
 
 export interface FieldDiff {
   fieldId: string;
@@ -17,6 +23,13 @@ function diffOne(oldField?: FieldDefinition, newField?: FieldDefinition): FieldC
   if (oldField.name !== newField.name) changes.push('renamed');
   if (oldField.type !== newField.type) changes.push('type-changed');
   if (!oldField.required && newField.required) changes.push('required-changed');
+  if (
+    oldField.type === 'reference' &&
+    newField.type === 'reference' &&
+    oldField.referenceContentTypeId !== newField.referenceContentTypeId
+  ) {
+    changes.push('reference-target-changed');
+  }
   return changes;
 }
 
@@ -39,6 +52,6 @@ export function diffFields(oldFields: FieldDefinition[], newFields: FieldDefinit
 }
 
 export function isRiskyChange(diffs: FieldDiff[]): boolean {
-  const riskyChanges: FieldChangeType[] = ['deleted', 'renamed', 'type-changed', 'required-changed'];
+  const riskyChanges: FieldChangeType[] = ['deleted', 'renamed', 'type-changed', 'required-changed', 'reference-target-changed'];
   return diffs.some((diff) => diff.changes.some((change) => riskyChanges.includes(change)));
 }

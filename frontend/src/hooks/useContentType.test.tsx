@@ -57,7 +57,7 @@ describe('usePreviewContentTypeChange', () => {
   afterEach(() => vi.clearAllMocks())
 
   it('calls the preview service with the proposed fields', async () => {
-    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: true, impacts: [] })
+    vi.mocked(contentTypesService.previewContentTypeChange).mockResolvedValue({ risky: true, impacts: [], baseVersion: 1 })
     const { wrapper } = withQueryClient()
 
     const { result } = renderHook(() => usePreviewContentTypeChange('1'), { wrapper })
@@ -65,6 +65,7 @@ describe('usePreviewContentTypeChange', () => {
 
     expect(contentTypesService.previewContentTypeChange).toHaveBeenCalledWith('1', [])
     expect(preview.risky).toBe(true)
+    expect(preview.baseVersion).toBe(1)
   })
 })
 
@@ -79,9 +80,9 @@ describe('useCommitContentTypeChange', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     const { result } = renderHook(() => useCommitContentTypeChange('1'), { wrapper })
-    await result.current.mutateAsync({ fields: [], backfills: {} })
+    await result.current.mutateAsync({ baseVersion: 1, fields: [], backfills: {} })
 
-    expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith('1', [], {})
+    expect(contentTypesService.commitContentTypeChange).toHaveBeenCalledWith('1', 1, [], {})
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['contentTypes', '1'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['contentTypes'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['entries', '1'] })

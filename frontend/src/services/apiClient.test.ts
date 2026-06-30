@@ -64,4 +64,27 @@ describe('apiFetch', () => {
       ],
     })
   })
+
+  it('throws an ApiError exposing currentVersion and currentFields from a 409 conflict body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          error: {
+            message: 'This content type changed since you started editing.',
+            currentVersion: 2,
+            currentFields: [{ id: 'f1', name: 'make', type: 'text', required: false }],
+          },
+        }),
+      })
+    )
+
+    await expect(apiFetch('/api/content-types/1/commit-change')).rejects.toMatchObject({
+      status: 409,
+      currentVersion: 2,
+      currentFields: [{ id: 'f1', name: 'make', type: 'text', required: false }],
+    })
+  })
 })

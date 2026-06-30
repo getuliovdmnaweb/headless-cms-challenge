@@ -4,10 +4,10 @@ import { diffFields } from '../validator/diffFields';
 import { migrateEntryData } from '../validator/migrateEntryData';
 import type { ContentType, FieldDefinition } from './contentTypes';
 
-export interface CommitResult {
-  contentType: ContentType;
-  migratedEntryIds: string[];
-}
+export type CommitOutcome =
+  | { status: 'committed'; contentType: ContentType; migratedEntryIds: string[] }
+  | { status: 'not-found' }
+  | { status: 'conflict'; currentVersion: number; currentFields: FieldDefinition[] };
 
 function toContentType(row: any): ContentType {
   return {
@@ -23,9 +23,10 @@ function toContentType(row: any): ContentType {
 
 export async function commitContentTypeChange(
   contentTypeId: string,
+  baseVersion: number,
   newFields: FieldDefinition[],
   backfillByFieldId: Record<string, unknown>
-): Promise<CommitResult | null> {
+): Promise<CommitOutcome> {
   const client: PoolClient = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -36,10 +37,24 @@ export async function commitContentTypeChange(
     );
     if (!currentResult.rows[0]) {
       await client.query('ROLLBACK');
-      return null;
+      return { status: 'not-found' };
     }
     const current = toContentType(currentResult.rows[0]);
+
+    if (current.version !== baseVersion) {
+      await client.query('ROLLBACK');
+      return { status: 'conflict', currentVersion: current.version, currentFields: current.fields };
+    }
+
     const diffs = diffFields(current.fields, newFields);
+
+    const checkEntryExists = async (targetContentTypeId: string, entryId: string): Promise<boolean> => {
+      const result = await client.query('SELECT 1 FROM entries WHERE content_type_id = $1 AND id = $2', [
+        targetContentTypeId,
+        entryId,
+      ]);
+      return (result.rowCount ?? 0) > 0;
+    };
 
     const updatedResult = await client.query(
       `UPDATE content_types SET fields = $2, version = version + 1, updated_at = now() WHERE id = $1
@@ -52,7 +67,7 @@ export async function commitContentTypeChange(
 
     const migratedEntryIds: string[] = [];
     for (const row of entriesResult.rows) {
-      const migratedData = migrateEntryData(diffs, row.data, backfillByFieldId);
+      const migratedData = await migrateEntryData(diffs, row.data, backfillByFieldId, checkEntryExists);
       await client.query(`UPDATE entries SET data = $2, content_type_version = $3, updated_at = now() WHERE id = $1`, [
         row.id,
         JSON.stringify(migratedData),
@@ -62,7 +77,7 @@ export async function commitContentTypeChange(
     }
 
     await client.query('COMMIT');
-    return { contentType: updated, migratedEntryIds };
+    return { status: 'committed', contentType: updated, migratedEntryIds };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

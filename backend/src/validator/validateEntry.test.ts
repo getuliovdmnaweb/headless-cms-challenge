@@ -1,5 +1,34 @@
 import type { FieldDefinition } from '../repositories/contentTypes';
-import { validateEntry, validateField } from './validateEntry';
+import { validateEntry, validateEntryAsync, validateField, validateFieldAsync } from './validateEntry';
+
+const alwaysExists = async () => true;
+const neverExists = async () => false;
+
+describe('validateFieldAsync', () => {
+  it('returns the sync validation error without checking existence', async () => {
+    const field: FieldDefinition = { id: 'f1', name: 'brand', type: 'text', required: true };
+    const checker = jest.fn(alwaysExists);
+    expect(await validateFieldAsync(field, undefined, checker)).toEqual({ field: 'brand', reason: 'required' });
+    expect(checker).not.toHaveBeenCalled();
+  });
+
+  it('returns a reference error when the referenced entry does not exist in the target content type', async () => {
+    const field: FieldDefinition = { id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' };
+    expect(await validateFieldAsync(field, 'p1', neverExists)).toEqual({ field: 'owner', reason: 'reference' });
+  });
+
+  it('returns null when the referenced entry exists in the target content type', async () => {
+    const field: FieldDefinition = { id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' };
+    expect(await validateFieldAsync(field, 'p1', alwaysExists)).toBeNull();
+  });
+
+  it('does not check existence for non-reference fields', async () => {
+    const field: FieldDefinition = { id: 'f1', name: 'brand', type: 'text', required: false };
+    const checker = jest.fn(alwaysExists);
+    expect(await validateFieldAsync(field, 'Toyota', checker)).toBeNull();
+    expect(checker).not.toHaveBeenCalled();
+  });
+});
 
 describe('validateField', () => {
   it('returns a required error for a missing required field', () => {
@@ -83,5 +112,27 @@ describe('validateEntry', () => {
       { field: 'brand', reason: 'required' },
       { field: 'year', reason: 'type' },
     ]);
+  });
+});
+
+describe('validateEntryAsync', () => {
+  it('reports a broken reference alongside other sync errors', async () => {
+    const fields: FieldDefinition[] = [
+      { id: 'f1', name: 'brand', type: 'text', required: true },
+      { id: 'f2', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' },
+    ];
+    const errors = await validateEntryAsync(fields, { owner: 'p1' }, async () => false);
+    expect(errors).toEqual([
+      { field: 'brand', reason: 'required' },
+      { field: 'owner', reason: 'reference' },
+    ]);
+  });
+
+  it('returns no errors when the reference exists and everything else is valid', async () => {
+    const fields: FieldDefinition[] = [
+      { id: 'f1', name: 'owner', type: 'reference', required: false, referenceContentTypeId: 'person' },
+    ];
+    const errors = await validateEntryAsync(fields, { owner: 'p1' }, async () => true);
+    expect(errors).toEqual([]);
   });
 });
