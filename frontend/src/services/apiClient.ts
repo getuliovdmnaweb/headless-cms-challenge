@@ -7,7 +7,7 @@ export interface ApiFieldError {
 }
 
 interface ApiErrorBody {
-  error?: ApiFieldError
+  error?: ApiFieldError & { currentVersion?: number; currentFields?: unknown[] }
   errors?: ApiFieldError[]
 }
 
@@ -15,6 +15,8 @@ export class ApiError extends Error {
   status: number
   field?: string
   errors: ApiFieldError[]
+  currentVersion?: number
+  currentFields?: unknown[]
 
   constructor(status: number, body?: ApiErrorBody) {
     const errors = body?.errors ?? (body?.error ? [body.error] : [])
@@ -22,6 +24,8 @@ export class ApiError extends Error {
     this.status = status
     this.field = errors[0]?.field
     this.errors = errors
+    this.currentVersion = body?.error?.currentVersion
+    this.currentFields = body?.error?.currentFields
   }
 }
 
