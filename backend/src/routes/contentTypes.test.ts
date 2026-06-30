@@ -120,6 +120,7 @@ describe('POST /api/content-types/:id/preview-change', () => {
     expect(res.body.risky).toBe(false);
     expect(res.body.impacts).toEqual([]);
     expect(res.body.baseVersion).toBe(1);
+    expect(res.body.currentFields).toEqual([]);
   });
 
   it('returns risky: true with classified impacts for a risky change, without writing anything', async () => {
