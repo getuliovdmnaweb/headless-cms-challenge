@@ -1,4 +1,4 @@
-import { pool } from '../db'
+import { prisma } from '../db'
 import { createContentType, listContentTypes, type FieldInput } from './contentTypes'
 
 function field(overrides: Partial<FieldInput> & Pick<FieldInput, 'name' | 'type'>): FieldInput {
@@ -6,12 +6,12 @@ function field(overrides: Partial<FieldInput> & Pick<FieldInput, 'name' | 'type'
 }
 
 beforeEach(async () => {
-  await pool.query('DELETE FROM fields')
-  await pool.query('DELETE FROM content_types')
+  await prisma.field.deleteMany()
+  await prisma.contentType.deleteMany()
 })
 
 afterAll(async () => {
-  await pool.end()
+  await prisma.$disconnect()
 })
 
 describe('createContentType', () => {

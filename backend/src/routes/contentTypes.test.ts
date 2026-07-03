@@ -1,14 +1,14 @@
 import request from 'supertest'
 import { app } from '../app'
-import { pool } from '../db'
+import { prisma } from '../db'
 
 beforeEach(async () => {
-  await pool.query('DELETE FROM fields')
-  await pool.query('DELETE FROM content_types')
+  await prisma.field.deleteMany()
+  await prisma.contentType.deleteMany()
 })
 
 afterAll(async () => {
-  await pool.end()
+  await prisma.$disconnect()
 })
 
 describe('POST /api/content-types', () => {

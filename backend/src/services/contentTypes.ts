@@ -1,8 +1,10 @@
-import { pool } from '../db'
+import { prisma } from '../db'
+
+export type FieldType = 'text' | 'number' | 'boolean' | 'date' | 'reference'
 
 export interface FieldInput {
   name: string
-  type: 'text' | 'number' | 'boolean' | 'date' | 'reference'
+  type: FieldType
   required: boolean
   position: number
 }
@@ -37,51 +39,55 @@ export async function createContentType(input: {
   fields: FieldInput[]
 }): Promise<ContentType> {
   const slug = toSlug(input.name)
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
 
-    const { rows: existing } = await client.query(
-      'SELECT id FROM content_types WHERE slug = $1',
-      [slug]
-    )
-    if (existing.length > 0) {
-      throw new Error(`A content type with this name already exists`)
-    }
+  const existing = await prisma.contentType.findUnique({ where: { slug } })
+  if (existing) {
+    throw new Error('A content type with this name already exists')
+  }
 
-    const { rows: [ct] } = await client.query(
-      `INSERT INTO content_types (name, slug) VALUES ($1, $2) RETURNING *`,
-      [input.name, slug]
-    )
+  const ct = await prisma.contentType.create({
+    data: {
+      name: input.name,
+      slug,
+      fields: {
+        create: input.fields.map(f => ({
+          name: f.name,
+          type: f.type,
+          required: f.required,
+          position: f.position,
+        })),
+      },
+    },
+    include: { fields: { orderBy: { position: 'asc' } } },
+  })
 
-    const fields: Field[] = []
-    for (const f of input.fields) {
-      const { rows: [field] } = await client.query(
-        `INSERT INTO fields (content_type_id, name, type, required, position)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [ct.id, f.name, f.type, f.required, f.position]
-      )
-      fields.push(field)
-    }
-
-    await client.query('COMMIT')
-    return { ...ct, fields }
-  } catch (err) {
-    await client.query('ROLLBACK')
-    throw err
-  } finally {
-    client.release()
+  return {
+    id: ct.id,
+    name: ct.name,
+    slug: ct.slug,
+    version: ct.version,
+    fields: ct.fields.map(f => ({
+      id: f.id,
+      content_type_id: f.contentTypeId,
+      name: f.name,
+      type: f.type as FieldType,
+      required: f.required,
+      position: f.position,
+    })),
   }
 }
 
 export async function listContentTypes(): Promise<ContentTypeSummary[]> {
-  const { rows } = await pool.query(`
-    SELECT ct.id, ct.name, ct.slug, ct.version,
-           COUNT(f.id)::int AS "fieldCount"
-    FROM content_types ct
-    LEFT JOIN fields f ON f.content_type_id = ct.id
-    GROUP BY ct.id
-    ORDER BY ct.created_at ASC
-  `)
-  return rows
+  const types = await prisma.contentType.findMany({
+    orderBy: { createdAt: 'asc' },
+    include: { _count: { select: { fields: true } } },
+  })
+
+  return types.map(ct => ({
+    id: ct.id,
+    name: ct.name,
+    slug: ct.slug,
+    version: ct.version,
+    fieldCount: ct._count.fields,
+  }))
 }
