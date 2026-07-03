@@ -51,7 +51,7 @@ export default function ContentTypeList() {
                   <td className="px-4 py-3 text-sm text-gray-500">{ct.fieldCount} {ct.fieldCount === 1 ? 'field' : 'fields'}</td>
                   <td className="px-4 py-3 text-right space-x-3">
                     <Link to={`/${ct.slug}/entries`} className="text-sm text-indigo-600 hover:underline">View content</Link>
-                    <Link to={`/${ct.slug}/edit`} className="text-sm text-gray-500 hover:underline">Edit fields</Link>
+                    <Link to={`/edit/${ct.slug}`} className="text-sm text-gray-500 hover:underline">Edit fields</Link>
                   </td>
                 </tr>
               ))}

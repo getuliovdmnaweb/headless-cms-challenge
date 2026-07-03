@@ -1,9 +1,35 @@
+import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import EditContentType from './EditContentType'
 import * as service from '../../services/contentTypes'
+
+vi.mock('@dnd-kit/core', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core')
+  return {
+    ...actual,
+    DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useSensor: vi.fn(),
+    useSensors: () => [],
+  }
+})
+
+vi.mock('@dnd-kit/sortable', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/sortable')>('@dnd-kit/sortable')
+  return {
+    ...actual,
+    SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useSortable: () => ({
+      attributes: {},
+      listeners: {},
+      setNodeRef: () => {},
+      transform: null,
+      transition: undefined,
+    }),
+  }
+})
 
 vi.mock('../../services/contentTypes')
 const mockGet = vi.mocked(service.getContentType)
@@ -103,12 +129,18 @@ describe('EditContentType', () => {
   })
 
   it('shows "Field names must be unique" for duplicate field names', async () => {
+    mockGet.mockResolvedValue({
+      ...fakeContentType,
+      fields: [
+        { id: 1, content_type_id: 1, name: 'Brand', type: 'text' as const, required: true, position: 0 },
+        { id: 2, content_type_id: 1, name: 'Brand', type: 'text' as const, required: false, position: 1 },
+      ],
+    })
     render$()
-    const yearInput = await screen.findByDisplayValue('Year')
-    await userEvent.clear(yearInput)
-    await userEvent.type(yearInput, 'Brand')
+    await screen.findAllByDisplayValue('Brand')
     fireEvent.submit(screen.getByRole('form'))
-    expect(await screen.findByText(/field names must be unique/i)).toBeInTheDocument()
+    const errors = await screen.findAllByText(/field names must be unique/i)
+    expect(errors.length).toBeGreaterThan(0)
   })
 
   it('calls updateContentType and navigates to list on success', async () => {

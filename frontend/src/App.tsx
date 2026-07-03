@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import ContentTypeList from './screens/contentTypes/ContentTypeList'
 import NewContentType from './screens/contentTypes/NewContentType'
+import EditContentType from './screens/contentTypes/EditContentType'
 
 export default function App() {
   return (
@@ -8,6 +9,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<ContentTypeList />} />
         <Route path="/new" element={<NewContentType />} />
+        <Route path="/edit/:slug" element={<EditContentType />} />
       </Routes>
     </div>
   )
