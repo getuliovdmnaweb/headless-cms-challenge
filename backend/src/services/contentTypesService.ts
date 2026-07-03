@@ -1,4 +1,4 @@
-import { prisma } from '../db'
+import * as repo from '../repositories/contentTypesRepository'
 
 export type FieldType = 'text' | 'number' | 'boolean' | 'date' | 'reference'
 
@@ -30,7 +30,7 @@ export interface ContentTypeSummary {
   fieldCount: number
 }
 
-function toSlug(name: string): string {
+export function toSlug(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 }
 
@@ -40,26 +40,10 @@ export async function createContentType(input: {
 }): Promise<ContentType> {
   const slug = toSlug(input.name)
 
-  const existing = await prisma.contentType.findUnique({ where: { slug } })
-  if (existing) {
-    throw new Error('A content type with this name already exists')
-  }
+  const existing = await repo.findBySlug(slug)
+  if (existing) throw new Error('A content type with this name already exists')
 
-  const ct = await prisma.contentType.create({
-    data: {
-      name: input.name,
-      slug,
-      fields: {
-        create: input.fields.map(f => ({
-          name: f.name,
-          type: f.type,
-          required: f.required,
-          position: f.position,
-        })),
-      },
-    },
-    include: { fields: { orderBy: { position: 'asc' } } },
-  })
+  const ct = await repo.createWithFields({ name: input.name, slug, fields: input.fields })
 
   return {
     id: ct.id,
@@ -78,11 +62,7 @@ export async function createContentType(input: {
 }
 
 export async function listContentTypes(): Promise<ContentTypeSummary[]> {
-  const types = await prisma.contentType.findMany({
-    orderBy: { createdAt: 'asc' },
-    include: { _count: { select: { fields: true } } },
-  })
-
+  const types = await repo.listWithFieldCount()
   return types.map(ct => ({
     id: ct.id,
     name: ct.name,
