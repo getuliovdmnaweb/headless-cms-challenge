@@ -1,5 +1,9 @@
 import { pool } from '../db'
-import { createContentType, listContentTypes } from './contentTypes'
+import { createContentType, listContentTypes, type FieldInput } from './contentTypes'
+
+function field(overrides: Partial<FieldInput> & Pick<FieldInput, 'name' | 'type'>): FieldInput {
+  return { required: false, position: 0, ...overrides }
+}
 
 beforeEach(async () => {
   await pool.query('DELETE FROM fields')
@@ -15,8 +19,8 @@ describe('createContentType', () => {
     const result = await createContentType({
       name: 'Article',
       fields: [
-        { name: 'Title', type: 'text', required: true, position: 0 },
-        { name: 'Published', type: 'boolean', required: false, position: 1 },
+        field({ name: 'Title', type: 'text', required: true, position: 0 }),
+        field({ name: 'Published', type: 'boolean', position: 1 }),
       ],
     })
 
@@ -31,7 +35,7 @@ describe('createContentType', () => {
   it('derives the slug from the name', async () => {
     const result = await createContentType({
       name: 'Blog Post',
-      fields: [{ name: 'Body', type: 'text', required: false, position: 0 }],
+      fields: [field({ name: 'Body', type: 'text' })],
     })
     expect(result.slug).toBe('blog-post')
   })
@@ -39,7 +43,7 @@ describe('createContentType', () => {
   it('throws when name already exists', async () => {
     const input = {
       name: 'Car',
-      fields: [{ name: 'Brand', type: 'text', required: true, position: 0 }],
+      fields: [field({ name: 'Brand', type: 'text', required: true })],
     }
     await createContentType(input)
     await expect(createContentType(input)).rejects.toThrow('already exists')
@@ -51,13 +55,13 @@ describe('listContentTypes', () => {
     await createContentType({
       name: 'Author',
       fields: [
-        { name: 'Name', type: 'text', required: true, position: 0 },
-        { name: 'Bio', type: 'text', required: false, position: 1 },
+        field({ name: 'Name', type: 'text', required: true, position: 0 }),
+        field({ name: 'Bio', type: 'text', position: 1 }),
       ],
     })
     await createContentType({
       name: 'Tag',
-      fields: [{ name: 'Label', type: 'text', required: true, position: 0 }],
+      fields: [field({ name: 'Label', type: 'text', required: true })],
     })
 
     const list = await listContentTypes()
