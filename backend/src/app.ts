@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import { contentTypesRouter } from './routes/contentTypes'
 
 export const app = express()
 
@@ -9,3 +10,5 @@ app.use(express.json())
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
+
+app.use('/api/content-types', contentTypesRouter)

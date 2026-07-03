@@ -1,9 +1,8 @@
 import { Pool } from 'pg'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from './generated/prisma'
 
-export const pool = new Pool({
-  host:     process.env.DB_HOST     ?? 'localhost',
-  port:     Number(process.env.DB_PORT ?? 5433),
-  user:     process.env.DB_USER     ?? 'cms',
-  password: process.env.DB_PASSWORD ?? 'cms',
-  database: process.env.DB_NAME     ?? 'cms',
-})
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL ?? 'postgresql://cms:cms@localhost:5433/cms' })
+const adapter = new PrismaPg(pool)
+
+export const prisma = new PrismaClient({ adapter })

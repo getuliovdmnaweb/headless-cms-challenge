@@ -126,17 +126,15 @@
         <h1 class="text-xl font-medium text-gray-900 mb-6">New content type</h1>
 
         <div class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-          <div class="flex gap-4">
-            <div class="flex-1">
-              <label class="block text-sm font-medium text-gray-600 mb-1.5">Name</label>
-              <input type="text" placeholder="e.g. Blog post" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-            </div>
-            <div class="flex-1">
-              <label class="block text-sm font-medium text-gray-600 mb-1.5">
-                Slug <span class="text-xs font-normal text-gray-400">auto-derived</span>
-              </label>
-              <input type="text" placeholder="blog-post" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-400 bg-gray-50">
-            </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-600 mb-1.5">Name</label>
+            <input type="text" placeholder="e.g. Blog post" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1.5">
+              Slug <span class="text-xs font-normal text-gray-400">auto-derived</span>
+            </label>
+            <input type="text" placeholder="blog-post" disabled class="w-full border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-400 bg-gray-50 cursor-not-allowed">
           </div>
         </div>
 
@@ -160,9 +158,25 @@
           </button>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-md transition-colors">Create content type</button>
           <button onclick="goTo(0)" class="border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-md hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
+        </div>
+
+        <!-- Empty-fields disabled state (shown when no fields exist) -->
+        <div class="mt-6 bg-white border border-gray-200 rounded-xl p-5">
+          <p class="text-sm font-medium text-gray-900 mb-4">Fields <span class="text-xs font-normal text-gray-400">(empty state)</span></p>
+          <p class="text-xs text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-md mb-3">No fields yet</p>
+          <button class="w-full border border-dashed border-indigo-300 rounded-md py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">
+            <i class="ti ti-plus mr-1"></i> Add field
+          </button>
+          <p class="text-xs text-gray-400 mt-3 flex items-center gap-1">
+            <i class="ti ti-info-circle text-sm"></i> Add at least one field to continue
+          </p>
+          <div class="flex gap-2 mt-4">
+            <button disabled class="bg-indigo-200 text-white text-sm px-4 py-2 rounded-md cursor-not-allowed opacity-60">Create content type</button>
+            <button onclick="goTo(0)" class="border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-md hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
+          </div>
         </div>
       </div>
 

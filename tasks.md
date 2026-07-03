@@ -28,8 +28,8 @@ User can create a content type with fields and see it in the list.
 ### Acceptance criteria
 
 Happy path:
-- [ ] User fills in a name — slug auto-derives (e.g. "Blog Post" → "blog-post")
-- [ ] User adds one or more fields (name, type, required toggle)
+- [ ] User fills in a name — slug auto-derives below the name field (e.g. "Blog Post" → "blog-post")
+- [ ] User adds one or more fields (name, type dropdown: text/number/boolean/date/reference, required toggle)
 - [ ] User clicks "Create content type" — type + fields saved in one transaction
 - [ ] User is redirected to the Content Type list
 - [ ] New type appears in the list with correct field count
@@ -37,7 +37,7 @@ Happy path:
 Error cases:
 - [ ] Empty name → "Name is required" (on submit)
 - [ ] Duplicate name → "A content type with this name already exists" (API error surfaced inline)
-- [ ] No fields added → "Add at least one field" (on submit)
+- [ ] No fields added → "Create content type" button is disabled; hint "Add at least one field to continue" shown below the empty fields section
 - [ ] Empty field name → "Field name is required" highlighted on the offending row (on submit)
 - [ ] Duplicate field name within the same type → "Field names must be unique" (on submit)
 - [ ] Cancel → returns to list with no changes saved
