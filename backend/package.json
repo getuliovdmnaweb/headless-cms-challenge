@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
+    "migrate": "ts-node src/migrate.ts",
     "test": "jest --passWithNoTests"
   },
   "dependencies": {
