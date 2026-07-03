@@ -51,15 +51,33 @@ Error cases:
 ### What ships
 User can rename the content type and add, rename, or remove fields (safe changes only — no type changes yet).
 
+### Design decisions
+- Slug is read-only on edit — never re-derived from a renamed name (changing slug would break existing references)
+- Field deletion has no data-impact warning in this slice — deferred to Slice 6
+- Drag-to-reorder via `⠿` handle (`@dnd-kit/sortable`)
+- PUT replaces all fields in a single transaction (delete old, insert new with updated positions)
+
 ### Acceptance criteria
-- [ ] "Edit fields" on the list navigates to the edit screen pre-filled
-- [ ] User can rename the content type
-- [ ] User can add a new field
+
+Happy path:
+- [ ] "Edit fields" link on the list navigates to `/edit/:slug`
+- [ ] Edit screen loads pre-filled: name editable, slug read-only, fields listed in saved order
+- [ ] User can rename the content type name
 - [ ] User can rename an existing field
-- [ ] User can delete a field
-- [ ] User can reorder fields (drag or position buttons)
-- [ ] Save updates the type and fields
-- [ ] Cancel returns to list with no changes
+- [ ] User can toggle required on any field
+- [ ] User can delete a field (row removed immediately, no confirmation for now)
+- [ ] User can drag fields to reorder via the `⠿` handle
+- [ ] User can add a new empty field row
+- [ ] "Save changes" → PUT /api/content-types/:slug, redirects to list on success
+- [ ] "Cancel" → navigates to list with no changes saved
+
+Error cases:
+- [ ] Empty name on submit → `"Name is required"` inline
+- [ ] Rename conflicts with another type → API 409 → `"A content type with this name already exists"` inline
+- [ ] Slug not found → API 404 → redirect to list (content type was deleted)
+- [ ] Empty field name on submit → `"Field name is required"` on the offending row
+- [ ] Duplicate field name on submit → `"Field names must be unique"` on the first duplicate row
+- [ ] All fields deleted → Save button disabled + `"Add at least one field to continue"` hint
 
 ---
 

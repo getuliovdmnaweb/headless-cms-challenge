@@ -1,5 +1,5 @@
 import { prisma } from '../db'
-import { findBySlug, createWithFields, listWithFieldCount } from './contentTypesRepository'
+import { findBySlug, findBySlugWithFields, createWithFields, listWithFieldCount, updateWithFields } from './contentTypesRepository'
 import type { FieldInput } from '../types/contentTypes'
 
 function field(overrides: Partial<FieldInput> & Pick<FieldInput, 'name' | 'type'>): FieldInput {
@@ -42,6 +42,70 @@ describe('createWithFields', () => {
     expect(ct.fields).toHaveLength(2)
     expect(ct.fields[0].name).toBe('Title')
     expect(ct.fields[0].required).toBe(true)
+  })
+})
+
+describe('findBySlugWithFields', () => {
+  it('returns null when no match', async () => {
+    expect(await findBySlugWithFields('ghost')).toBeNull()
+  })
+
+  it('returns content type with fields ordered by position', async () => {
+    await createWithFields({
+      name: 'Car',
+      slug: 'car',
+      fields: [
+        field({ name: 'Brand', type: 'text', position: 0 }),
+        field({ name: 'Year', type: 'number', position: 1 }),
+      ],
+    })
+    const result = await findBySlugWithFields('car')
+    expect(result?.name).toBe('Car')
+    expect(result?.fields).toHaveLength(2)
+    expect(result?.fields[0].name).toBe('Brand')
+    expect(result?.fields[1].name).toBe('Year')
+  })
+})
+
+describe('updateWithFields', () => {
+  it('updates the name and replaces all fields', async () => {
+    await createWithFields({
+      name: 'Car',
+      slug: 'car',
+      fields: [field({ name: 'Brand', type: 'text', position: 0 })],
+    })
+
+    const updated = await updateWithFields('car', {
+      name: 'Automobile',
+      fields: [
+        field({ name: 'Make', type: 'text', position: 0 }),
+        field({ name: 'Year', type: 'number', position: 1 }),
+      ],
+    })
+
+    expect(updated.name).toBe('Automobile')
+    expect(updated.slug).toBe('car')
+    expect(updated.fields).toHaveLength(2)
+    expect(updated.fields[0].name).toBe('Make')
+    expect(updated.fields[1].name).toBe('Year')
+  })
+
+  it('removes fields that are no longer in the list', async () => {
+    await createWithFields({
+      name: 'Car',
+      slug: 'car',
+      fields: [
+        field({ name: 'Brand', type: 'text', position: 0 }),
+        field({ name: 'Model', type: 'text', position: 1 }),
+      ],
+    })
+
+    const updated = await updateWithFields('car', {
+      name: 'Car',
+      fields: [field({ name: 'Brand', type: 'text', position: 0 })],
+    })
+
+    expect(updated.fields).toHaveLength(1)
   })
 })
 
