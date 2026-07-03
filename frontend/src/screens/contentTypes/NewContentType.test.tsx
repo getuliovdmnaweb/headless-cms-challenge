@@ -59,7 +59,7 @@ describe('NewContentType', () => {
     render$()
     await userEvent.click(screen.getByRole('button', { name: /add field/i }))
     fireEvent.submit(screen.getByRole('form'))
-    expect(await screen.findByText(/name is required/i)).toBeInTheDocument()
+    expect(await screen.findByText('Name is required')).toBeInTheDocument()
   })
 
   it('shows "Field name is required" when a field has no name', async () => {

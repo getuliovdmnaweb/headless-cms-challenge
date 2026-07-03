@@ -1,7 +1,14 @@
+import { Routes, Route } from 'react-router-dom'
+import ContentTypeList from './screens/contentTypes/ContentTypeList'
+import NewContentType from './screens/contentTypes/NewContentType'
+
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Headless CMS</p>
+    <div className="min-h-screen bg-gray-50">
+      <Routes>
+        <Route path="/" element={<ContentTypeList />} />
+        <Route path="/new" element={<NewContentType />} />
+      </Routes>
     </div>
   )
 }
