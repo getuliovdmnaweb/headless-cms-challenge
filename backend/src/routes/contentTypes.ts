@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import * as controller from '../controllers/contentTypesController'
+import * as ContentTypesController from '../controllers/contentTypesController'
 
 export const contentTypesRouter = Router()
 
-contentTypesRouter.get('/', controller.listContentTypes)
-contentTypesRouter.post('/', controller.createContentType)
+contentTypesRouter.get('/', ContentTypesController.listContentTypes)
+contentTypesRouter.post('/', ContentTypesController.createContentType)

@@ -1,5 +1,5 @@
 import { prisma } from '../db'
-import type { FieldInput } from '../services/contentTypesService'
+import type { FieldInput } from '../types/contentTypes'
 
 export async function findBySlug(slug: string) {
   return prisma.contentType.findUnique({ where: { slug } })

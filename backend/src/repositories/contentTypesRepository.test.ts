@@ -1,6 +1,6 @@
 import { prisma } from '../db'
 import { findBySlug, createWithFields, listWithFieldCount } from './contentTypesRepository'
-import type { FieldInput } from '../services/contentTypesService'
+import type { FieldInput } from '../types/contentTypes'
 
 function field(overrides: Partial<FieldInput> & Pick<FieldInput, 'name' | 'type'>): FieldInput {
   return { required: false, position: 0, ...overrides }
