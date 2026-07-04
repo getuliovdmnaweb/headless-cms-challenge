@@ -1,4 +1,4 @@
-import { createContentType, getContentType, listContentTypes, toSlug, updateContentType } from './contentTypesService'
+import { createContentType, deleteContentType, getContentType, listContentTypes, toSlug, updateContentType } from './contentTypesService'
 import * as repo from '../repositories/contentTypesRepository'
 
 jest.mock('../repositories/contentTypesRepository')
@@ -8,6 +8,7 @@ const mockFindBySlugWithFields = repo.findBySlugWithFields as jest.MockedFunctio
 const mockCreateWithFields = repo.createWithFields as jest.MockedFunction<typeof repo.createWithFields>
 const mockUpdateWithFields = repo.updateWithFields as jest.MockedFunction<typeof repo.updateWithFields>
 const mockListWithFieldCount = repo.listWithFieldCount as jest.MockedFunction<typeof repo.listWithFieldCount>
+const mockDeleteBySlug = repo.deleteBySlug as jest.MockedFunction<typeof repo.deleteBySlug>
 
 const fakeCtRow = (overrides = {}) => ({
   id: 1, name: 'Article', slug: 'article', version: 1,
@@ -102,6 +103,20 @@ describe('updateContentType', () => {
 
     expect(mockUpdateWithFields).toHaveBeenCalledWith('car', expect.objectContaining({ name: 'Renamed Car' }))
     expect(result.name).toBe('Renamed Car')
+  })
+})
+
+describe('deleteContentType', () => {
+  it('throws when slug not found', async () => {
+    mockFindBySlug.mockResolvedValue(null)
+    await expect(deleteContentType('ghost')).rejects.toThrow('not found')
+  })
+
+  it('calls repo.deleteBySlug when content type exists', async () => {
+    mockFindBySlug.mockResolvedValue(fakeCtRow({ slug: 'car' }))
+    mockDeleteBySlug.mockResolvedValue(undefined)
+    await deleteContentType('car')
+    expect(mockDeleteBySlug).toHaveBeenCalledWith('car')
   })
 })
 
