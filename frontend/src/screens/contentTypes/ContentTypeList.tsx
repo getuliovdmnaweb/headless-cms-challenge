@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { deleteContentType, listContentTypes } from '../../services/contentTypes'
+import ErrorBanner from '../../components/shared/ErrorBanner'
 import type { ContentTypeSummary } from '../../types/contentType'
 
 export default function ContentTypeList() {
+  const location = useLocation()
+  const locationError = (location.state as { error?: string } | null)?.error ?? ''
+
   const [types, setTypes] = useState<ContentTypeSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +30,7 @@ export default function ContentTypeList() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
+      <ErrorBanner message={locationError} />
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-medium text-gray-900">Content types</h1>
         <Link

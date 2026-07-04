@@ -166,9 +166,11 @@ describe('EditContentType', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/')
   })
 
-  it('redirects to list when slug is not found', async () => {
+  it('redirects to list with error state when slug is not found', async () => {
     mockGet.mockRejectedValue(new Error('Content type not found'))
     render$()
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/', { state: { error: 'Content type not found.' } })
+    )
   })
 })
