@@ -55,6 +55,15 @@ export async function updateWithFields(slug: string, data: { name: string; field
   })
 }
 
+export async function deleteBySlug(slug: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const ct = await tx.contentType.findUnique({ where: { slug }, select: { id: true } })
+    if (!ct) return
+    await tx.field.deleteMany({ where: { contentTypeId: ct.id } })
+    await tx.contentType.delete({ where: { slug } })
+  })
+}
+
 export async function listWithFieldCount() {
   return prisma.contentType.findMany({
     orderBy: { createdAt: 'asc' },
