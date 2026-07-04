@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createContentType } from '../../services/contentTypes'
-import type { FieldInput, FieldType } from '../../types/contentType'
+import { createContentType, listContentTypes } from '../../services/contentTypes'
+import type { FieldInput, FieldType, ContentTypeSummary } from '../../types/contentType'
 
 interface FieldRow extends FieldInput {
   _key: number
@@ -21,8 +21,13 @@ export default function NewContentType() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [fields, setFields] = useState<FieldRow[]>([])
+  const [allTypes, setAllTypes] = useState<ContentTypeSummary[]>([])
 
   const slug = toSlug(name)
+
+  useEffect(() => {
+    listContentTypes().then(setAllTypes).catch(() => {})
+  }, [])
 
   function addField() {
     setFields(prev => [...prev, { _key: keyCounter++, name: '', type: 'text', required: false, position: prev.length }])
@@ -63,7 +68,7 @@ export default function NewContentType() {
     try {
       await createContentType({
         name: name.trim(),
-        fields: fields.map(({ name, type, required, position }) => ({ name, type, required, position })),
+        fields: fields.map(({ name, type, required, position, options }) => ({ name, type, required, position, options })),
       })
       navigate('/')
     } catch (err) {
@@ -132,7 +137,7 @@ export default function NewContentType() {
               {f.error && <span className="text-xs text-red-600 whitespace-nowrap">{f.error}</span>}
               <select
                 value={f.type}
-                onChange={e => updateField(f._key, { type: e.target.value as FieldType })}
+                onChange={e => updateField(f._key, { type: e.target.value as FieldType, options: {} })}
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm w-28"
               >
                 <option value="text">text</option>
@@ -141,6 +146,20 @@ export default function NewContentType() {
                 <option value="date">date</option>
                 <option value="reference">reference</option>
               </select>
+              {f.type === 'reference' && (
+                <select
+                  aria-label="References"
+                  value={f.options?.targetSlug ?? ''}
+                  onChange={e => updateField(f._key, { options: { targetSlug: e.target.value } })}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-32"
+                  disabled={allTypes.length === 0}
+                >
+                  <option value="">{allTypes.length === 0 ? 'No types available' : '— pick a type —'}</option>
+                  {allTypes.map(t => (
+                    <option key={t.slug} value={t.slug}>{t.name}</option>
+                  ))}
+                </select>
+              )}
               <label className="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
                 <input type="checkbox" checked={f.required} onChange={e => updateField(f._key, { required: e.target.checked })} />
                 Required

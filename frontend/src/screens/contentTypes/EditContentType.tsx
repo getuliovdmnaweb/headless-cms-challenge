@@ -15,8 +15,8 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getContentType, updateContentType } from '../../services/contentTypes'
-import type { FieldInput, FieldType } from '../../types/contentType'
+import { getContentType, updateContentType, listContentTypes } from '../../services/contentTypes'
+import type { FieldInput, FieldType, ContentTypeSummary } from '../../types/contentType'
 
 interface FieldRow extends FieldInput {
   _key: number
@@ -27,13 +27,16 @@ let keyCounter = 0
 
 interface SortableFieldRowProps {
   field: FieldRow
+  currentSlug: string
+  allTypes: ContentTypeSummary[]
   onChange: (key: number, patch: Partial<FieldRow>) => void
   onRemove: (key: number) => void
 }
 
-function SortableFieldRow({ field: f, onChange, onRemove }: SortableFieldRowProps) {
+function SortableFieldRow({ field: f, currentSlug, allTypes, onChange, onRemove }: SortableFieldRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: f._key })
   const style = { transform: CSS.Transform.toString(transform), transition }
+  const targetTypes = allTypes.filter(t => t.slug !== currentSlug)
 
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-2 mb-2 p-2 border border-gray-200 rounded-md bg-white">
@@ -56,7 +59,7 @@ function SortableFieldRow({ field: f, onChange, onRemove }: SortableFieldRowProp
       {f.error && <span className="text-xs text-red-600 whitespace-nowrap">{f.error}</span>}
       <select
         value={f.type}
-        onChange={e => onChange(f._key, { type: e.target.value as FieldType })}
+        onChange={e => onChange(f._key, { type: e.target.value as FieldType, options: {} })}
         className="border border-gray-300 rounded px-2 py-1.5 text-sm w-28"
       >
         <option value="text">text</option>
@@ -65,6 +68,20 @@ function SortableFieldRow({ field: f, onChange, onRemove }: SortableFieldRowProp
         <option value="date">date</option>
         <option value="reference">reference</option>
       </select>
+      {f.type === 'reference' && (
+        <select
+          aria-label="References"
+          value={f.options?.targetSlug ?? ''}
+          onChange={e => onChange(f._key, { options: { targetSlug: e.target.value } })}
+          className="border border-gray-300 rounded px-2 py-1.5 text-sm w-32"
+          disabled={targetTypes.length === 0}
+        >
+          <option value="">{targetTypes.length === 0 ? 'No types available' : '— pick a type —'}</option>
+          {targetTypes.map(t => (
+            <option key={t.slug} value={t.slug}>{t.name}</option>
+          ))}
+        </select>
+      )}
       <label className="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
         <input type="checkbox" checked={f.required} onChange={e => onChange(f._key, { required: e.target.checked })} />
         Required
@@ -90,15 +107,17 @@ export default function EditContentType() {
   const [submitting, setSubmitting] = useState(false)
   const [fields, setFields] = useState<FieldRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [allTypes, setAllTypes] = useState<ContentTypeSummary[]>([])
 
   const sensors = useSensors(useSensor(PointerSensor))
 
   useEffect(() => {
     if (!slug) return
-    getContentType(slug)
-      .then(ct => {
+    Promise.all([getContentType(slug), listContentTypes()])
+      .then(([ct, types]) => {
         setName(ct.name)
         setFields(ct.fields.map(f => ({ ...f, _key: keyCounter++ })))
+        setAllTypes(types)
       })
       .catch(() => navigate('/', { state: { error: 'Content type not found.' } }))
       .finally(() => setLoading(false))
@@ -155,7 +174,7 @@ export default function EditContentType() {
     try {
       await updateContentType(slug!, {
         name: name.trim(),
-        fields: fields.map(({ name, type, required, position }) => ({ name, type, required, position })),
+        fields: fields.map(({ name, type, required, position, options }) => ({ name, type, required, position, options })),
       })
       navigate('/')
     } catch (err) {
@@ -216,7 +235,7 @@ export default function EditContentType() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={fields.map(f => f._key)} strategy={verticalListSortingStrategy}>
               {fields.map(f => (
-                <SortableFieldRow key={f._key} field={f} onChange={updateField} onRemove={removeField} />
+                <SortableFieldRow key={f._key} field={f} currentSlug={slug!} allTypes={allTypes} onChange={updateField} onRemove={removeField} />
               ))}
             </SortableContext>
           </DndContext>

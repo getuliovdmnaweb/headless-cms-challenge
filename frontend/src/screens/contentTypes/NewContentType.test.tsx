@@ -7,6 +7,7 @@ import * as service from '../../services/contentTypes'
 
 vi.mock('../../services/contentTypes')
 const mockCreate = vi.mocked(service.createContentType)
+const mockList = vi.mocked(service.listContentTypes)
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -25,6 +26,7 @@ describe('NewContentType', () => {
       id: 1, name: 'Article', slug: 'article', version: 1,
       fields: [{ id: 1, content_type_id: 1, name: 'Title', type: 'text', required: true, position: 0 }],
     })
+    mockList.mockResolvedValue([])
   })
 
   it('renders the form with Name and Slug fields', () => {

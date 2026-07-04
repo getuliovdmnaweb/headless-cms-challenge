@@ -1,5 +1,9 @@
 export type FieldType = 'text' | 'number' | 'boolean' | 'date' | 'reference'
 
+export interface FieldOptions {
+  targetSlug?: string
+}
+
 export interface Field {
   id: number
   content_type_id: number
@@ -7,6 +11,7 @@ export interface Field {
   type: FieldType
   required: boolean
   position: number
+  options?: FieldOptions
 }
 
 export interface ContentType {
@@ -30,4 +35,5 @@ export interface FieldInput {
   type: FieldType
   required: boolean
   position: number
+  options?: FieldOptions
 }
