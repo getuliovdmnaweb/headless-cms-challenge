@@ -63,8 +63,13 @@ export default function EditEntry() {
     try {
       await updateEntry(slug!, Number(id), data)
       navigate(`/${slug}/entries`)
-    } catch {
-      setApiError('Something went wrong')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg === 'Entry not found') {
+        navigate(`/${slug}/entries`, { state: { error: 'Entry not found.' } })
+      } else {
+        setApiError('Something went wrong')
+      }
     } finally {
       setSubmitting(false)
     }
