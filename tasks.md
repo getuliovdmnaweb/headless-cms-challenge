@@ -222,6 +222,48 @@ Unauthenticated REST endpoints for reading content. No UI.
 
 ---
 
+## Slice 7 — Reference field
+**Branch:** `feature/reference-field`
+**Dependencies:** Slice 3 (entries), Slice 4 (edit/delete entries)
+
+### What ships
+A reference field type that links entries in one content type to entries in another. The builder lets the author pick the target content type; the entry form renders a dropdown populated with entries from that target.
+
+### Design decisions
+- Target content type stored as `options.targetSlug` in the existing `options` JSONB column — no migration needed
+- Stored value in entry `data` is the referenced entry's numeric ID
+- Option label = first text field value of the referenced entry, fallback `Entry #<id>`
+- Two-tier `isValid`: list view checks presence only (fast); edit view checks existence (full DB lookup)
+- Changing a reference field's target type = risky schema change (existing IDs become meaningless)
+- A content type cannot reference itself
+
+### Acceptance criteria
+
+Happy path — builder:
+- [ ] Selecting type `reference` reveals a second dropdown: "→" + all existing content type names
+- [ ] Selecting a target saves `{ targetSlug: "slug" }` into `options`
+- [ ] Field row shows a "references [TypeName]" badge
+- [ ] If no other content types exist, target dropdown shows "No types available" (disabled)
+- [ ] A content type cannot reference itself — self is excluded from the target list
+
+Happy path — entry form:
+- [ ] Reference field renders a `<select>` with entries from the target content type
+- [ ] Each option label is the first text field value, falling back to `Entry #<id>`
+- [ ] Selected value stored in entry `data` as the numeric entry ID
+- [ ] On edit, the current value is pre-selected
+- [ ] If target has no entries, shows empty state with a link to add entries to it
+
+Validation:
+- [ ] `required = true` + no selection → `<FieldName> is required` inline error on submit
+- [ ] List view: reference field present if value is non-null (no existence check)
+- [ ] Edit view: if referenced entry was deleted → "Referenced [TypeName] entry no longer exists" inline, field treated as invalid
+
+Schema evolution:
+- [ ] Changing a reference field's target type is classified as a risky change in the review modal
+- [ ] Entries whose reference value becomes orphaned (target CT deleted) remain but surface as invalid on edit load
+
+---
+
 ## Slice 8 — Docs
 **Branch:** `feature/docs`
 **Dependencies:** all slices
