@@ -97,12 +97,22 @@ describe('EditEntry', () => {
     expect(mockUpdateEntry).not.toHaveBeenCalled()
   })
 
-  it('shows API error when updateEntry fails', async () => {
+  it('shows API error when updateEntry fails with a generic error', async () => {
     mockUpdateEntry.mockRejectedValue(new Error('Server error'))
     render$()
     await screen.findByDisplayValue('Toyota')
     fireEvent.click(screen.getByRole('button', { name: /save/i }))
     expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument()
+  })
+
+  it('navigates to list with error state when PUT returns 404 (entry not found)', async () => {
+    mockUpdateEntry.mockRejectedValue(new Error('Entry not found'))
+    render$()
+    await screen.findByDisplayValue('Toyota')
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    await vi.waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/car/entries', { state: { error: 'Entry not found.' } })
+    )
   })
 
   it('navigates to list with error state when entry not found on load', async () => {
