@@ -53,3 +53,42 @@ export async function createEntry(slug: string, data: EntryData): Promise<EntryS
     isValid: computeIsValid(entry.data as EntryData, ct.fields),
   }
 }
+
+export async function getEntry(slug: string, id: number): Promise<EntrySummary> {
+  const ct = await ContentTypesRepository.findBySlugWithFields(slug)
+  if (!ct) throw new Error('Content type not found')
+
+  const entry = await EntriesRepository.findById(id)
+  if (!entry || entry.contentTypeId !== ct.id) throw new Error('Entry not found')
+
+  return {
+    id: entry.id,
+    data: entry.data as EntryData,
+    isValid: computeIsValid(entry.data as EntryData, ct.fields),
+  }
+}
+
+export async function updateEntry(slug: string, id: number, data: EntryData): Promise<EntrySummary> {
+  const ct = await ContentTypesRepository.findBySlugWithFields(slug)
+  if (!ct) throw new Error('Content type not found')
+
+  const existing = await EntriesRepository.findById(id)
+  if (!existing || existing.contentTypeId !== ct.id) throw new Error('Entry not found')
+
+  const entry = await EntriesRepository.updateById(id, data)
+  return {
+    id: entry.id,
+    data: entry.data as EntryData,
+    isValid: computeIsValid(entry.data as EntryData, ct.fields),
+  }
+}
+
+export async function deleteEntry(slug: string, id: number): Promise<void> {
+  const ct = await ContentTypesRepository.findBySlugWithFields(slug)
+  if (!ct) throw new Error('Content type not found')
+
+  const existing = await EntriesRepository.findById(id)
+  if (!existing || existing.contentTypeId !== ct.id) throw new Error('Entry not found')
+
+  await EntriesRepository.deleteById(id)
+}
