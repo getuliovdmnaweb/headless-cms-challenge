@@ -19,9 +19,8 @@ const fakeCt = (overrides = {}) => ({
   ...overrides,
 })
 
-const fakeEntryRow = (data: Record<string, unknown> = {}) => ({
-  id: 1, contentTypeId: 1, data, createdAt: new Date(), updatedAt: new Date(),
-})
+const fakeEntryRow = (data: Record<string, unknown> = {}) =>
+  ({ id: 1, contentTypeId: 1, data, createdAt: new Date(), updatedAt: new Date() }) as Awaited<ReturnType<typeof entriesRepo.createEntry>>
 
 beforeEach(() => jest.clearAllMocks())
 
