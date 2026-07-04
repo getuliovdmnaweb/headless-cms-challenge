@@ -2,6 +2,20 @@ import { Request, Response } from 'express'
 import * as ContentTypesService from '../services/contentTypesService'
 import { AppErrors } from '../constants/errors'
 
+export async function deleteContentType(req: Request, res: Response): Promise<void> {
+  try {
+    await ContentTypesService.deleteContentType(req.params.slug)
+    res.status(204).send()
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : AppErrors.INTERNAL_SERVER_ERROR.error
+    if (message.includes('not found')) {
+      res.status(AppErrors.CONTENT_TYPE_NOT_FOUND.status).json({ error: AppErrors.CONTENT_TYPE_NOT_FOUND.error })
+      return
+    }
+    res.status(AppErrors.INTERNAL_SERVER_ERROR.status).json({ error: message })
+  }
+}
+
 export async function listContentTypes(_req: Request, res: Response): Promise<void> {
   const types = await ContentTypesService.listContentTypes()
   res.json(types)
