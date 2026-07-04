@@ -4,5 +4,6 @@ export const AppErrors = {
   CONTENT_TYPE_EXISTS: { status: 409, error: 'A content type with this name already exists' },
   CONTENT_TYPE_NOT_FOUND: { status: 404, error: 'Content type not found' },
   ENTRY_DATA_REQUIRED: { status: 400, error: 'Entry data is required' },
+  ENTRY_NOT_FOUND: { status: 404, error: 'Entry not found' },
   INTERNAL_SERVER_ERROR: { status: 500, error: 'Internal server error' },
 } as const

@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { getEntries } from '../../services/entries'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { getEntries, deleteEntry } from '../../services/entries'
+import ErrorBanner from '../../components/shared/ErrorBanner'
 import type { EntryListResponse } from '../../types/entry'
 
 export default function EntryList() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const locationError = (location.state as { error?: string } | null)?.error ?? ''
+
   const [data, setData] = useState<EntryListResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [bannerError, setBannerError] = useState(locationError)
 
   useEffect(() => {
     if (!slug) return
@@ -18,14 +23,27 @@ export default function EntryList() {
         if (err.message.includes('not found')) {
           navigate('/')
         } else {
-          setError('Something went wrong')
+          setFetchError('Something went wrong')
         }
       })
       .finally(() => setLoading(false))
   }, [slug, navigate])
 
+  async function handleDelete(id: number) {
+    if (!window.confirm('Delete this entry? This cannot be undone.')) return
+    try {
+      await deleteEntry(slug!, id)
+      setData(prev =>
+        prev ? { ...prev, entries: prev.entries.filter(e => e.id !== id) } : prev
+      )
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      setBannerError(msg.endsWith('.') ? msg : `${msg}.`)
+    }
+  }
+
   if (loading) return <p className="p-8 text-sm text-gray-400">Loading…</p>
-  if (error) return <p className="p-8 text-sm text-red-500">{error}</p>
+  if (fetchError) return <p className="p-8 text-sm text-red-500">{fetchError}</p>
   if (!data) return null
 
   const { contentType, entries } = data
@@ -40,6 +58,8 @@ export default function EntryList() {
           <span>{contentType.name}</span>
         </nav>
       </div>
+
+      <ErrorBanner message={bannerError} />
 
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -105,8 +125,20 @@ export default function EntryList() {
                     }
                   </td>
                   <td className="px-4 py-3 text-right space-x-3">
-                    <button className="text-sm text-indigo-600 hover:underline">Edit</button>
-                    <button className="text-sm text-red-500 hover:underline">Delete</button>
+                    <Link
+                      to={`/${slug}/entries/${entry.id}/edit`}
+                      className="text-sm text-indigo-600 hover:underline"
+                    >
+                      Edit
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label="Delete"
+                      onClick={() => handleDelete(entry.id)}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

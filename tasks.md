@@ -124,18 +124,48 @@ Error cases:
 
 ---
 
-## Slice 4 — Edit and delete entries
+## Slice 4 — Edit and delete entries + error banner
 **Branch:** `feature/edit-delete-entries`
 **Dependencies:** Slice 3
 
 ### What ships
-User can edit and delete existing entries.
+- "View content" link on the content type list
+- Edit entry (`/:slug/entries/:id/edit`) — pre-filled form, PUT on save
+- Delete entry — `window.confirm()` → DELETE → row removed
+- Shared `ErrorBanner` component replacing all silent redirects across existing screens
+
+### Design decisions
+- Edit route: `/:slug/entries/:id/edit` (dedicated page, same pattern as NewEntry)
+- Hard delete, no soft delete
+- Error state passed via React Router navigate state: `navigate(path, { state: { error: 'message' } })`
+- Target pages read `useLocation().state?.error` and render the dismissible banner
+- `ErrorBanner` lives in `src/components/shared/` — used across 4+ screens
 
 ### Acceptance criteria
-- [ ] "Edit" on an entry row opens the editor pre-filled with current values
-- [ ] User edits values and saves — entry updated in DB
-- [ ] "Delete" on an entry row removes it after confirmation
-- [ ] Cancelled edit returns to the list with no changes
+
+Happy path:
+- [ ] "View content" link on each ContentTypeList row navigates to `/:slug/entries`
+- [ ] "Edit" on an entry row opens `/:slug/entries/:id/edit` pre-filled with current values
+- [ ] User edits values and saves → `PUT /api/content-types/:slug/entries/:id` → redirects to `/:slug/entries`
+- [ ] "Delete" → `window.confirm()` → `DELETE /api/content-types/:slug/entries/:id` → row removed
+- [ ] Cancel on edit → returns to `/:slug/entries`, no changes saved
+
+Error cases — edit:
+- [ ] Required field empty on submit → `<FieldName> is required` inline
+- [ ] Content type 404 on load → redirect to `/` + banner: "Content type not found."
+- [ ] Entry 404 on load → redirect to `/:slug/entries` + banner: "Entry not found."
+- [ ] PUT returns 404 → redirect to `/:slug/entries` + banner: "Entry not found."
+- [ ] API error on save → "Something went wrong" inline below Save
+
+Error cases — delete:
+- [ ] User cancels confirm → no DELETE, row stays
+- [ ] DELETE returns 404 → "Entry not found." dismissible banner on list
+- [ ] DELETE API error → "Something went wrong." dismissible banner on list
+
+Error banner — backfill across existing screens:
+- [ ] `EditContentType` 404 on load → redirect to `/` + "Content type not found."
+- [ ] `EntryList` 404 on load → redirect to `/` + "Content type not found."
+- [ ] `NewEntry` 404 on load → redirect to `/` + "Content type not found."
 
 ---
 

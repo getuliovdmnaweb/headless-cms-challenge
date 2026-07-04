@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { getEntry, updateEntry } from '../../services/entries'
 import { getContentType } from '../../services/contentTypes'
-import { createEntry } from '../../services/entries'
 import type { ContentType, FieldType } from '../../types/contentType'
 import type { EntryData } from '../../types/entry'
 
 interface FieldError { [fieldName: string]: string }
 
-export default function NewEntry() {
-  const { slug } = useParams<{ slug: string }>()
+export default function EditEntry() {
+  const { slug, id } = useParams<{ slug: string; id: string }>()
   const navigate = useNavigate()
+
   const [ct, setCt] = useState<ContentType | null>(null)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<EntryData>({})
@@ -18,19 +19,21 @@ export default function NewEntry() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!slug) return
-    getContentType(slug)
-      .then(ct => {
-        setCt(ct)
-        const initial: EntryData = {}
-        ct.fields.forEach(f => {
-          if (f.type === 'boolean') initial[f.name] = false
-        })
-        setData(initial)
+    if (!slug || !id) return
+    Promise.all([getContentType(slug), getEntry(slug, Number(id))])
+      .then(([contentType, entry]) => {
+        setCt(contentType)
+        setData(entry.data)
       })
-      .catch(() => navigate('/', { state: { error: 'Content type not found.' } }))
+      .catch((err: Error) => {
+        if (err.message.includes('Entry not found')) {
+          navigate(`/${slug}/entries`, { state: { error: 'Entry not found.' } })
+        } else {
+          navigate('/', { state: { error: 'Content type not found.' } })
+        }
+      })
       .finally(() => setLoading(false))
-  }, [slug, navigate])
+  }, [slug, id, navigate])
 
   function handleChange(name: string, value: EntryData[string]) {
     setData(prev => ({ ...prev, [name]: value }))
@@ -58,10 +61,15 @@ export default function NewEntry() {
     setSubmitting(true)
     setApiError(null)
     try {
-      await createEntry(slug!, data)
+      await updateEntry(slug!, Number(id), data)
       navigate(`/${slug}/entries`)
-    } catch {
-      setApiError('Something went wrong')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg === 'Entry not found') {
+        navigate(`/${slug}/entries`, { state: { error: 'Entry not found.' } })
+      } else {
+        setApiError('Something went wrong')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -79,12 +87,12 @@ export default function NewEntry() {
           <span className="mx-1.5">›</span>
           <Link to={`/${slug}/entries`} className="text-indigo-600 hover:underline">{ct.name}</Link>
           <span className="mx-1.5">›</span>
-          <span>New entry</span>
+          <span>Edit entry</span>
         </nav>
       </div>
-      <h1 className="text-xl font-medium text-gray-900 mb-6">New {ct.name} entry</h1>
+      <h1 className="text-xl font-medium text-gray-900 mb-6">Edit {ct.name} entry</h1>
 
-      <form aria-label="New entry" onSubmit={handleSubmit} noValidate>
+      <form aria-label="Edit entry" onSubmit={handleSubmit} noValidate>
         <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4 max-w-xl space-y-4">
           {ct.fields.map(f => (
             <FieldInput

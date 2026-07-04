@@ -100,7 +100,7 @@ export default function EditContentType() {
         setName(ct.name)
         setFields(ct.fields.map(f => ({ ...f, _key: keyCounter++ })))
       })
-      .catch(() => navigate('/'))
+      .catch(() => navigate('/', { state: { error: 'Content type not found.' } }))
       .finally(() => setLoading(false))
   }, [slug, navigate])
 

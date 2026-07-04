@@ -1,5 +1,5 @@
 import { prisma } from '../db'
-import { createEntry, listByContentTypeId } from './entriesRepository'
+import { createEntry, listByContentTypeId, findById, updateById, deleteById } from './entriesRepository'
 import { createWithFields } from './contentTypesRepository'
 
 async function seedContentType() {
@@ -52,5 +52,38 @@ describe('listByContentTypeId', () => {
     expect(entries).toHaveLength(2)
     expect((entries[0].data as Record<string, unknown>).Brand).toBe('Toyota')
     expect((entries[1].data as Record<string, unknown>).Brand).toBe('Ford')
+  })
+})
+
+describe('findById', () => {
+  it('returns the entry when it exists', async () => {
+    const ct = await seedContentType()
+    const created = await createEntry(ct.id, { Brand: 'Toyota' })
+    const found = await findById(created.id)
+    expect(found?.id).toBe(created.id)
+    expect((found?.data as Record<string, unknown>).Brand).toBe('Toyota')
+  })
+
+  it('returns null when entry does not exist', async () => {
+    expect(await findById(99999)).toBeNull()
+  })
+})
+
+describe('updateById', () => {
+  it('updates the entry data', async () => {
+    const ct = await seedContentType()
+    const created = await createEntry(ct.id, { Brand: 'Toyota' })
+    const updated = await updateById(created.id, { Brand: 'Honda', Year: 2022 })
+    expect((updated.data as Record<string, unknown>).Brand).toBe('Honda')
+    expect((updated.data as Record<string, unknown>).Year).toBe(2022)
+  })
+})
+
+describe('deleteById', () => {
+  it('removes the entry from the database', async () => {
+    const ct = await seedContentType()
+    const created = await createEntry(ct.id, { Brand: 'Toyota' })
+    await deleteById(created.id)
+    expect(await findById(created.id)).toBeNull()
   })
 })

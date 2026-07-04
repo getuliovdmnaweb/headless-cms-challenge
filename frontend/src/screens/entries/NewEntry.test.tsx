@@ -123,9 +123,11 @@ describe('NewEntry', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/car/entries')
   })
 
-  it('redirects to / when content type not found', async () => {
+  it('redirects to / with error state when content type not found', async () => {
     mockGetCt.mockRejectedValue(new Error('Content type not found'))
     render$()
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/', { state: { error: 'Content type not found.' } })
+    )
   })
 })

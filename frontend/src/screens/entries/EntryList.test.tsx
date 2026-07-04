@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import EntryList from './EntryList'
@@ -7,6 +7,7 @@ import type { EntryListResponse } from '../../types/entry'
 
 vi.mock('../../services/entries')
 const mockGet = vi.mocked(service.getEntries)
+const mockDelete = vi.mocked(service.deleteEntry)
 const mockNavigate = vi.fn()
 
 vi.mock('react-router-dom', async () => {
@@ -28,9 +29,9 @@ const fakeResponse: EntryListResponse = {
   ],
 }
 
-function render$(slug = 'car') {
+function render$(slug = 'car', locationState?: object) {
   return render(
-    <MemoryRouter initialEntries={[`/${slug}/entries`]}>
+    <MemoryRouter initialEntries={[{ pathname: `/${slug}/entries`, state: locationState }]}>
       <Routes>
         <Route path="/:slug/entries" element={<EntryList />} />
       </Routes>
@@ -39,7 +40,12 @@ function render$(slug = 'car') {
 }
 
 describe('EntryList', () => {
-  beforeEach(() => { vi.clearAllMocks(); mockGet.mockResolvedValue(fakeResponse) })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue(fakeResponse)
+    mockDelete.mockResolvedValue(undefined)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  })
 
   it('shows the content type name as heading', async () => {
     render$()
@@ -107,5 +113,56 @@ describe('EntryList', () => {
     render$()
     await screen.findByRole('heading', { name: /car/i })
     expect(screen.getByRole('link', { name: /edit fields/i })).toHaveAttribute('href', '/edit/car')
+  })
+
+  it('Edit button for entry is a link to /:slug/entries/:id/edit', async () => {
+    render$()
+    await screen.findByText('Toyota')
+    const editLinks = screen.getAllByRole('link', { name: /^edit$/i })
+    expect(editLinks[0]).toHaveAttribute('href', '/car/entries/1/edit')
+  })
+
+  it('Delete calls window.confirm and then deleteEntry', async () => {
+    render$()
+    await screen.findByText('Toyota')
+    fireEvent.click(screen.getAllByRole('button', { name: /delete/i })[0])
+    expect(window.confirm).toHaveBeenCalled()
+    await vi.waitFor(() => expect(mockDelete).toHaveBeenCalledWith('car', 1))
+  })
+
+  it('Delete does nothing when confirm is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render$()
+    await screen.findByText('Toyota')
+    fireEvent.click(screen.getAllByRole('button', { name: /delete/i })[0])
+    expect(mockDelete).not.toHaveBeenCalled()
+  })
+
+  it('Delete removes the row on success', async () => {
+    render$()
+    await screen.findByText('Toyota')
+    fireEvent.click(screen.getAllByRole('button', { name: /delete/i })[0])
+    await vi.waitFor(() => expect(screen.queryByText('Toyota')).not.toBeInTheDocument())
+  })
+
+  it('Delete shows ErrorBanner when entry not found', async () => {
+    mockDelete.mockRejectedValue(new Error('Entry not found'))
+    render$()
+    await screen.findByText('Toyota')
+    fireEvent.click(screen.getAllByRole('button', { name: /delete/i })[0])
+    expect(await screen.findByText('Entry not found.')).toBeInTheDocument()
+  })
+
+  it('Delete shows ErrorBanner on generic API error', async () => {
+    mockDelete.mockRejectedValue(new Error('Something went wrong'))
+    render$()
+    await screen.findByText('Toyota')
+    fireEvent.click(screen.getAllByRole('button', { name: /delete/i })[0])
+    expect(await screen.findByText('Something went wrong.')).toBeInTheDocument()
+  })
+
+  it('shows ErrorBanner from location state on load', async () => {
+    render$('car', { error: 'Entry not found.' })
+    expect(await screen.findByText('Entry not found.')).toBeInTheDocument()
   })
 })
