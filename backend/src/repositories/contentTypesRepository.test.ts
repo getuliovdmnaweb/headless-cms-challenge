@@ -1,5 +1,5 @@
 import { prisma } from '../db'
-import { findBySlug, findBySlugWithFields, createWithFields, listWithFieldCount, updateWithFields } from './contentTypesRepository'
+import { findBySlug, findBySlugWithFields, createWithFields, listWithFieldCount, updateWithFields, deleteBySlug } from './contentTypesRepository'
 import type { FieldInput } from '../types/contentTypes'
 
 function field(overrides: Partial<FieldInput> & Pick<FieldInput, 'name' | 'type'>): FieldInput {
@@ -106,6 +106,22 @@ describe('updateWithFields', () => {
     })
 
     expect(updated.fields).toHaveLength(1)
+  })
+})
+
+describe('deleteBySlug', () => {
+  it('removes the content type and its fields', async () => {
+    await createWithFields({
+      name: 'Car',
+      slug: 'car',
+      fields: [field({ name: 'Brand', type: 'text', position: 0 })],
+    })
+    await deleteBySlug('car')
+    expect(await findBySlug('car')).toBeNull()
+  })
+
+  it('is a no-op when the slug does not exist', async () => {
+    await expect(deleteBySlug('ghost')).resolves.not.toThrow()
   })
 })
 
