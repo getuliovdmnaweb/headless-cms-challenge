@@ -99,13 +99,13 @@ describe('EntryList', () => {
 
   it('"New entry" link navigates to /:slug/entries/new', async () => {
     render$()
-    await screen.findByText('Car')
+    await screen.findByRole('heading', { name: /car/i })
     expect(screen.getByRole('link', { name: /new entry/i })).toHaveAttribute('href', '/car/entries/new')
   })
 
   it('"Edit fields" link navigates to /edit/:slug', async () => {
     render$()
-    await screen.findByText('Car')
+    await screen.findByRole('heading', { name: /car/i })
     expect(screen.getByRole('link', { name: /edit fields/i })).toHaveAttribute('href', '/edit/car')
   })
 })
