@@ -91,14 +91,36 @@ Error cases:
 ### What ships
 User can view entries for a content type and create a new one. The entry form is generated dynamically from the type's fields.
 
+### Design decisions
+- Routes: `/:slug/entries` (list), `/:slug/entries/new` (create)
+- Entry data stored as JSONB; `isValid` computed server-side (not stored)
+- `isValid`: all required fields of type text/number/date have a non-empty value in `data`; boolean fields are always valid; reference fields are skipped (not implemented in this slice)
+- Reference fields render as disabled inputs with "Reference coming soon" label — no validation
+- Boolean fields render as checkboxes — always valid regardless of required flag
+- Entries list table columns are derived from the content type's fields ordered by position
+- Missing values in the list show as "— missing" in gray italic
+
 ### Acceptance criteria
-- [ ] "View content" on the list navigates to the entries screen for that type
-- [ ] Entries screen shows all entries with a valid/invalid status badge
-- [ ] "New entry" opens the entry editor with a form generated from the type's fields
-- [ ] User fills in fields and saves — entry stored in DB
-- [ ] Required field left empty → inline error "X is required" (on submit)
-- [ ] Valid entry shows green "Valid" badge in the list
-- [ ] Invalid entry (missing required field) shows red "Invalid" badge
+
+Happy path:
+- [ ] "View content" on the list navigates to `/:slug/entries`
+- [ ] Entries list shows the content type name, entry count, "Edit fields" link, and "+ New entry" button
+- [ ] Table columns match the content type's field names (in position order) + Status + Actions
+- [ ] Each row shows field values; missing values show "— missing" in gray italic
+- [ ] Valid entry row has green "Valid" badge; invalid row has `bg-red-50` background and red "Invalid" badge
+- [ ] "New entry" navigates to `/:slug/entries/new`
+- [ ] Entry form renders one input per field: text → text input, number → number input, boolean → checkbox, date → date input, reference → disabled with "Reference coming soon"
+- [ ] Required fields show `*` next to their label
+- [ ] "Save" → POST /api/content-types/:slug/entries → redirects to `/:slug/entries` on success
+- [ ] "Cancel" → navigates back to `/:slug/entries` with no changes saved
+
+Error cases:
+- [ ] Content type not found (404) when loading entries list → redirect to `/`
+- [ ] Network error fetching entries → "Something went wrong" inline
+- [ ] Empty entries list → "No entries yet — create your first one."
+- [ ] Required field (text/number/date) empty on submit → `"<FieldName> is required"` below that field
+- [ ] Network error on save → `"Something went wrong"` below the Save button
+- [ ] Cancel → navigates to `/:slug/entries`, no API call made
 
 ---
 
