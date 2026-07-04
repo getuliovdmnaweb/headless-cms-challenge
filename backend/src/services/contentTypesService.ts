@@ -1,7 +1,7 @@
 import * as ContentTypesRepository from '../repositories/contentTypesRepository'
-import type { FieldType, FieldInput, Field, ContentType, ContentTypeSummary } from '../types/contentTypes'
+import type { FieldType, FieldOptions, FieldInput, Field, ContentType, ContentTypeSummary } from '../types/contentTypes'
 
-export type { FieldType, FieldInput, Field, ContentType, ContentTypeSummary }
+export type { FieldType, FieldOptions, FieldInput, Field, ContentType, ContentTypeSummary }
 
 export function toSlug(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -20,7 +20,12 @@ export async function createContentType(input: {
   return mapContentType(ct)
 }
 
-function mapContentType(ct: { id: number; name: string; slug: string; version: number; fields: { id: number; contentTypeId: number; name: string; type: string; required: boolean; position: number }[] }): ContentType {
+type CtWithFields = {
+  id: number; name: string; slug: string; version: number
+  fields: Array<{ id: number; contentTypeId: number; name: string; type: string; required: boolean; position: number; options: unknown }>
+}
+
+function mapContentType(ct: CtWithFields): ContentType {
   return {
     id: ct.id,
     name: ct.name,
@@ -33,6 +38,7 @@ function mapContentType(ct: { id: number; name: string; slug: string; version: n
       type: f.type as FieldType,
       required: f.required,
       position: f.position,
+      options: (f.options as FieldOptions | null) ?? {},
     })),
   }
 }
