@@ -57,6 +57,12 @@ export async function updateContentType(slug: string, input: { name: string; fie
   return mapContentType(ct)
 }
 
+export async function deleteContentType(slug: string): Promise<void> {
+  const existing = await ContentTypesRepository.findBySlug(slug)
+  if (!existing) throw new Error('Content type not found')
+  await ContentTypesRepository.deleteBySlug(slug)
+}
+
 export async function listContentTypes(): Promise<ContentTypeSummary[]> {
   const types = await ContentTypesRepository.listWithFieldCount()
   return types.map(ct => ({
