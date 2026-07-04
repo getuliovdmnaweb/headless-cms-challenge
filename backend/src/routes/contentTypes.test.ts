@@ -109,6 +109,24 @@ describe('GET /api/content-types/:slug', () => {
   })
 })
 
+describe('DELETE /api/content-types/:slug', () => {
+  it('returns 404 for unknown slug', async () => {
+    const res = await request(app).delete('/api/content-types/ghost')
+    expect(res.status).toBe(404)
+  })
+
+  it('deletes the content type and returns 204', async () => {
+    await request(app).post('/api/content-types').send({
+      name: 'Deletable',
+      fields: [{ name: 'Title', type: 'text', required: false, position: 0 }],
+    })
+    const res = await request(app).delete('/api/content-types/deletable')
+    expect(res.status).toBe(204)
+    const check = await request(app).get('/api/content-types/deletable')
+    expect(check.status).toBe(404)
+  })
+})
+
 describe('PUT /api/content-types/:slug', () => {
   it('returns 404 for unknown slug', async () => {
     const res = await request(app)
