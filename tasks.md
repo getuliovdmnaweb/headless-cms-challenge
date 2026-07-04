@@ -49,13 +49,14 @@ Error cases:
 **Dependencies:** Slice 1
 
 ### What ships
-User can rename the content type and add, rename, or remove fields (safe changes only — no type changes yet).
+User can rename the content type, add/rename/remove fields, reorder fields, and delete a content type.
 
 ### Design decisions
 - Slug is read-only on edit — never re-derived from a renamed name (changing slug would break existing references)
 - Field deletion has no data-impact warning in this slice — deferred to Slice 6
 - Drag-to-reorder via `⠿` handle (`@dnd-kit/sortable`)
 - PUT replaces all fields in a single transaction (delete old, insert new with updated positions)
+- Content type deletion requires `window.confirm()` before calling `DELETE /api/content-types/:slug`
 
 ### Acceptance criteria
 
@@ -70,6 +71,7 @@ Happy path:
 - [ ] User can add a new empty field row
 - [ ] "Save changes" → PUT /api/content-types/:slug, redirects to list on success
 - [ ] "Cancel" → navigates to list with no changes saved
+- [ ] Delete button on each list row → `window.confirm()` → DELETE /api/content-types/:slug → row removed from list
 
 Error cases:
 - [ ] Empty name on submit → `"Name is required"` inline
@@ -78,6 +80,7 @@ Error cases:
 - [ ] Empty field name on submit → `"Field name is required"` on the offending row
 - [ ] Duplicate field name on submit → `"Field names must be unique"` on the first duplicate row
 - [ ] All fields deleted → Save button disabled + `"Add at least one field to continue"` hint
+- [ ] User cancels confirm dialog → no DELETE call, row stays in list
 
 ---
 
