@@ -13,6 +13,7 @@ vi.mock('../../services/entries')
 
 const mockGetCt = vi.mocked(ctService.getContentType)
 const mockCreate = vi.mocked(entriesService.createEntry)
+const mockGetEntries = vi.mocked(entriesService.getEntries)
 const mockNavigate = vi.fn()
 
 vi.mock('react-router-dom', async () => {
@@ -27,7 +28,17 @@ const fakeCt: ContentType = {
     { id: 2, content_type_id: 1, name: 'Year', type: 'number', required: false, position: 1 },
     { id: 3, content_type_id: 1, name: 'Active', type: 'boolean', required: false, position: 2 },
     { id: 4, content_type_id: 1, name: 'Built', type: 'date', required: false, position: 3 },
-    { id: 5, content_type_id: 1, name: 'Owner', type: 'reference', required: false, position: 4 },
+    { id: 5, content_type_id: 1, name: 'Owner', type: 'reference', required: false, position: 4, options: { targetSlug: 'person' } },
+  ],
+}
+
+const fakePersonEntries = {
+  contentType: { id: 2, name: 'Person', slug: 'person', version: 1, fields: [
+    { id: 10, name: 'Full Name', type: 'text', required: true, position: 0 },
+  ]},
+  entries: [
+    { id: 1, data: { 'Full Name': 'Alice Souza' }, isValid: true },
+    { id: 2, data: { 'Full Name': 'Bob Lima' }, isValid: true },
   ],
 }
 
@@ -48,6 +59,7 @@ describe('NewEntry', () => {
     vi.clearAllMocks()
     mockGetCt.mockResolvedValue(fakeCt)
     mockCreate.mockResolvedValue(fakeEntry)
+    mockGetEntries.mockResolvedValue(fakePersonEntries)
   })
 
   it('shows the content type name in the heading', async () => {
@@ -78,10 +90,34 @@ describe('NewEntry', () => {
     expect(screen.getByLabelText(/built/i)).toHaveAttribute('type', 'date')
   })
 
-  it('renders reference field as disabled with "Reference coming soon"', async () => {
+  it('renders reference field as a select with entries from target type', async () => {
     render$()
     await screen.findByLabelText(/brand/i)
-    expect(screen.getByText(/reference coming soon/i)).toBeInTheDocument()
+    expect(await screen.findByRole('combobox', { name: /owner/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Alice Souza' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Bob Lima' })).toBeInTheDocument()
+  })
+
+  it('shows empty state when target type has no entries', async () => {
+    mockGetEntries.mockResolvedValue({ ...fakePersonEntries, entries: [] })
+    render$()
+    await screen.findByLabelText(/brand/i)
+    expect(await screen.findByText(/no person entries yet/i)).toBeInTheDocument()
+  })
+
+  it('shows "Owner is required" when required reference field has no selection', async () => {
+    mockGetCt.mockResolvedValue({
+      ...fakeCt,
+      fields: [
+        ...fakeCt.fields.slice(0, 4),
+        { id: 5, content_type_id: 1, name: 'Owner', type: 'reference', required: true, position: 4, options: { targetSlug: 'person' } },
+      ],
+    })
+    render$()
+    const brandInput = await screen.findByLabelText(/brand/i)
+    await userEvent.type(brandInput, 'Toyota')
+    fireEvent.submit(screen.getByRole('form'))
+    expect(await screen.findByText('Owner is required')).toBeInTheDocument()
   })
 
   it('marks required fields with *', async () => {
