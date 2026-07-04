@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listContentTypes } from '../../services/contentTypes'
+import { deleteContentType, listContentTypes } from '../../services/contentTypes'
 import type { ContentTypeSummary } from '../../types/contentType'
 
 export default function ContentTypeList() {
@@ -14,6 +14,12 @@ export default function ContentTypeList() {
       .catch(() => setError('Something went wrong'))
       .finally(() => setLoading(false))
   }, [])
+
+  async function handleDelete(slug: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
+    await deleteContentType(slug)
+    setTypes(prev => prev.filter(t => t.slug !== slug))
+  }
 
   if (loading) return <p className="p-8 text-sm text-gray-400">Loading…</p>
   if (error) return <p className="p-8 text-sm text-red-500">{error}</p>
@@ -51,7 +57,15 @@ export default function ContentTypeList() {
                   <td className="px-4 py-3 text-sm text-gray-500">{ct.fieldCount} {ct.fieldCount === 1 ? 'field' : 'fields'}</td>
                   <td className="px-4 py-3 text-right space-x-3">
                     <Link to={`/${ct.slug}/entries`} className="text-sm text-indigo-600 hover:underline">View content</Link>
-                    <Link to={`/${ct.slug}/edit`} className="text-sm text-gray-500 hover:underline">Edit fields</Link>
+                    <Link to={`/edit/${ct.slug}`} className="text-sm text-gray-500 hover:underline">Edit fields</Link>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${ct.name}`}
+                      onClick={() => handleDelete(ct.slug, ct.name)}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

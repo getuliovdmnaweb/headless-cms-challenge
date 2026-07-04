@@ -17,7 +17,10 @@ export async function createContentType(input: {
   if (existing) throw new Error('A content type with this name already exists')
 
   const ct = await ContentTypesRepository.createWithFields({ name: input.name, slug, fields: input.fields })
+  return mapContentType(ct)
+}
 
+function mapContentType(ct: { id: number; name: string; slug: string; version: number; fields: { id: number; contentTypeId: number; name: string; type: string; required: boolean; position: number }[] }): ContentType {
   return {
     id: ct.id,
     name: ct.name,
@@ -32,6 +35,32 @@ export async function createContentType(input: {
       position: f.position,
     })),
   }
+}
+
+export async function getContentType(slug: string): Promise<ContentType | null> {
+  const ct = await ContentTypesRepository.findBySlugWithFields(slug)
+  if (!ct) return null
+  return mapContentType(ct)
+}
+
+export async function updateContentType(slug: string, input: { name: string; fields: FieldInput[] }): Promise<ContentType> {
+  const existing = await ContentTypesRepository.findBySlug(slug)
+  if (!existing) throw new Error('Content type not found')
+
+  const newSlug = toSlug(input.name)
+  if (newSlug !== slug) {
+    const conflict = await ContentTypesRepository.findBySlug(newSlug)
+    if (conflict) throw new Error('A content type with this name already exists')
+  }
+
+  const ct = await ContentTypesRepository.updateWithFields(slug, { name: input.name, fields: input.fields })
+  return mapContentType(ct)
+}
+
+export async function deleteContentType(slug: string): Promise<void> {
+  const existing = await ContentTypesRepository.findBySlug(slug)
+  if (!existing) throw new Error('Content type not found')
+  await ContentTypesRepository.deleteBySlug(slug)
 }
 
 export async function listContentTypes(): Promise<ContentTypeSummary[]> {

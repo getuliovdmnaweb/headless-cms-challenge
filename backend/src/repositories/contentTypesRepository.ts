@@ -27,6 +27,43 @@ export async function createWithFields(data: {
   })
 }
 
+export async function findBySlugWithFields(slug: string) {
+  return prisma.contentType.findUnique({
+    where: { slug },
+    include: { fields: { orderBy: { position: 'asc' } } },
+  })
+}
+
+export async function updateWithFields(slug: string, data: { name: string; fields: FieldInput[] }) {
+  return prisma.$transaction(async (tx) => {
+    await tx.field.deleteMany({ where: { contentType: { slug } } })
+    return tx.contentType.update({
+      where: { slug },
+      data: {
+        name: data.name,
+        fields: {
+          create: data.fields.map(f => ({
+            name: f.name,
+            type: f.type,
+            required: f.required,
+            position: f.position,
+          })),
+        },
+      },
+      include: { fields: { orderBy: { position: 'asc' } } },
+    })
+  })
+}
+
+export async function deleteBySlug(slug: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const ct = await tx.contentType.findUnique({ where: { slug }, select: { id: true } })
+    if (!ct) return
+    await tx.field.deleteMany({ where: { contentTypeId: ct.id } })
+    await tx.contentType.delete({ where: { slug } })
+  })
+}
+
 export async function listWithFieldCount() {
   return prisma.contentType.findMany({
     orderBy: { createdAt: 'asc' },
