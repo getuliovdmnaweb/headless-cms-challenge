@@ -38,3 +38,8 @@ export async function updateContentType(slug: string, payload: { name: string; f
   if (!res.ok) throw new Error(data.error ?? 'Failed to update content type')
   return data
 }
+
+export async function deleteContentType(slug: string): Promise<void> {
+  const res = await fetch(`${BASE}/content-types/${slug}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete content type')
+}
