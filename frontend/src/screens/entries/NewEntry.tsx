@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getContentType } from '../../services/contentTypes'
-import { createEntry } from '../../services/entries'
-import type { ContentType, FieldType } from '../../types/contentType'
-import type { EntryData } from '../../types/entry'
+import { createEntry, getEntries } from '../../services/entries'
+import type { ContentType, FieldType, FieldOptions } from '../../types/contentType'
+import type { EntryData, EntryListResponse } from '../../types/entry'
 
 interface FieldError { [fieldName: string]: string }
 
@@ -16,6 +16,7 @@ export default function NewEntry() {
   const [errors, setErrors] = useState<FieldError>({})
   const [apiError, setApiError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [refEntries, setRefEntries] = useState<Record<string, EntryListResponse>>({})
 
   useEffect(() => {
     if (!slug) return
@@ -27,6 +28,18 @@ export default function NewEntry() {
           if (f.type === 'boolean') initial[f.name] = false
         })
         setData(initial)
+        const refFields = ct.fields.filter(f => f.type === 'reference' && f.options?.targetSlug)
+        Promise.all(
+          refFields.map(f =>
+            getEntries(f.options!.targetSlug!)
+              .then(result => ({ slug: f.options!.targetSlug!, result }))
+              .catch(() => null)
+          )
+        ).then(results => {
+          const map: Record<string, EntryListResponse> = {}
+          results.forEach(r => { if (r) map[r.slug] = r.result })
+          setRefEntries(map)
+        })
       })
       .catch(() => navigate('/', { state: { error: 'Content type not found.' } }))
       .finally(() => setLoading(false))
@@ -43,7 +56,7 @@ export default function NewEntry() {
 
     const newErrors: FieldError = {}
     ct.fields.forEach(f => {
-      if (f.required && f.type !== 'boolean' && f.type !== 'reference') {
+      if (f.required && f.type !== 'boolean') {
         const val = data[f.name]
         if (val === undefined || val === null || val === '') {
           newErrors[f.name] = `${f.name} is required`
@@ -95,6 +108,8 @@ export default function NewEntry() {
               value={data[f.name]}
               error={errors[f.name]}
               onChange={val => handleChange(f.name, val)}
+              options={f.options}
+              refData={f.options?.targetSlug ? refEntries[f.options.targetSlug] : undefined}
             />
           ))}
         </div>
@@ -129,11 +144,42 @@ interface FieldInputProps {
   value: EntryData[string]
   error?: string
   onChange: (val: EntryData[string]) => void
+  options?: FieldOptions
+  refData?: EntryListResponse
 }
 
-function FieldInput({ name, type, required, value, error, onChange }: FieldInputProps) {
+function FieldInput({ name, type, required, value, error, onChange, refData }: FieldInputProps) {
   const labelId = `field-${name}`
   const baseInput = `w-full border rounded-md px-3 py-2 text-sm ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`
+
+  function renderReference() {
+    if (!refData) return null
+    const { entries, contentType: targetCt } = refData
+    const textField = targetCt.fields.find(f => f.type === 'text')
+    const getLabel = (e: { id: number; data: EntryData }) =>
+      textField ? String(e.data[textField.name] ?? `Entry #${e.id}`) : `Entry #${e.id}`
+    const currentId = value !== undefined && value !== null && value !== '' ? Number(value) : null
+    const dangles = currentId !== null && !entries.some(e => e.id === currentId)
+    if (dangles || (entries.length === 0 && currentId !== null)) {
+      return <p className="text-sm text-red-600">Entry no longer exists</p>
+    }
+    if (entries.length === 0) {
+      return <p className="text-sm text-gray-500">No {targetCt.name} entries yet</p>
+    }
+    return (
+      <select
+        id={labelId}
+        value={currentId !== null ? String(currentId) : ''}
+        onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+        className={baseInput}
+      >
+        <option value="">— select —</option>
+        {entries.map(e => (
+          <option key={e.id} value={String(e.id)}>{getLabel(e)}</option>
+        ))}
+      </select>
+    )
+  }
 
   return (
     <div>
@@ -177,11 +223,7 @@ function FieldInput({ name, type, required, value, error, onChange }: FieldInput
           className={baseInput}
         />
       )}
-      {type === 'reference' && (
-        <div className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-400 bg-gray-50">
-          Reference coming soon
-        </div>
-      )}
+      {type === 'reference' && renderReference()}
 
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>

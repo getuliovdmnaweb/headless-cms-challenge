@@ -34,6 +34,7 @@ vi.mock('@dnd-kit/sortable', async () => {
 vi.mock('../../services/contentTypes')
 const mockGet = vi.mocked(service.getContentType)
 const mockUpdate = vi.mocked(service.updateContentType)
+const mockList = vi.mocked(service.listContentTypes)
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -67,6 +68,10 @@ describe('EditContentType', () => {
     vi.clearAllMocks()
     mockGet.mockResolvedValue(fakeContentType)
     mockUpdate.mockResolvedValue({ ...fakeContentType, name: 'Automobile' })
+    mockList.mockResolvedValue([
+      { id: 1, name: 'Car', slug: 'car', version: 1, fieldCount: 2 },
+      { id: 2, name: 'Person', slug: 'person', version: 1, fieldCount: 1 },
+    ])
   })
 
   it('pre-fills name from loaded content type', async () => {
@@ -171,6 +176,42 @@ describe('EditContentType', () => {
     render$()
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith('/', { state: { error: 'Content type not found.' } })
+    )
+  })
+
+  it('shows target content type dropdown when field type is reference', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const typeSelects = screen.getAllByRole('combobox')
+    await userEvent.selectOptions(typeSelects[0], 'reference')
+    expect(await screen.findByRole('combobox', { name: /references/i })).toBeInTheDocument()
+  })
+
+  it('excludes the current content type from the reference target list', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const typeSelects = screen.getAllByRole('combobox')
+    await userEvent.selectOptions(typeSelects[0], 'reference')
+    const targetSelect = await screen.findByRole('combobox', { name: /references/i })
+    const options = Array.from(targetSelect.querySelectorAll('option')).map(o => o.textContent)
+    expect(options).not.toContain('Car')
+    expect(options).toContain('Person')
+  })
+
+  it('saves options.targetSlug when submitting a reference field', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const typeSelects = screen.getAllByRole('combobox')
+    await userEvent.selectOptions(typeSelects[0], 'reference')
+    const targetSelect = await screen.findByRole('combobox', { name: /references/i })
+    await userEvent.selectOptions(targetSelect, 'person')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith('car', expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({ type: 'reference', options: { targetSlug: 'person' } }),
+        ]),
+      }))
     )
   })
 })

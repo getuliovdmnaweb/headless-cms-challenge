@@ -130,3 +130,58 @@ describe('listContentTypes', () => {
     expect(list[0].fieldCount).toBe(3)
   })
 })
+
+describe('reference field — options.targetSlug', () => {
+  it('createContentType passes options through to repository', async () => {
+    mockFindBySlug.mockResolvedValue(null)
+    mockCreateWithFields.mockResolvedValue(
+      fakeCtRow({
+        fields: [{ id: 1, contentTypeId: 1, name: 'Owner', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' }, createdAt: new Date(), updatedAt: new Date() }],
+      })
+    )
+    await createContentType({
+      name: 'Car',
+      fields: [{ name: 'Owner', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' } }],
+    })
+    expect(mockCreateWithFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({ options: { targetSlug: 'person' } }),
+        ]),
+      })
+    )
+  })
+
+  it('getContentType returns options.targetSlug on reference field', async () => {
+    mockFindBySlugWithFields.mockResolvedValue(
+      fakeCtRow({
+        fields: [{ id: 1, contentTypeId: 1, name: 'Owner', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' }, createdAt: new Date(), updatedAt: new Date() }],
+      })
+    )
+    const result = await getContentType('car')
+    expect(result?.fields[0].options).toEqual({ targetSlug: 'person' })
+  })
+
+  it('updateContentType passes options through to repository', async () => {
+    mockFindBySlug.mockImplementation(async (slug) =>
+      slug === 'car' ? fakeCtRow({ slug: 'car', name: 'Car' }) : null
+    )
+    mockUpdateWithFields.mockResolvedValue(
+      fakeCtRow({
+        fields: [{ id: 1, contentTypeId: 1, name: 'Owner', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' }, createdAt: new Date(), updatedAt: new Date() }],
+      })
+    )
+    await updateContentType('car', {
+      name: 'Car',
+      fields: [{ name: 'Owner', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' } }],
+    })
+    expect(mockUpdateWithFields).toHaveBeenCalledWith(
+      'car',
+      expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({ options: { targetSlug: 'person' } }),
+        ]),
+      })
+    )
+  })
+})

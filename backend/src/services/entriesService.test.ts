@@ -71,10 +71,32 @@ describe('listEntries', () => {
     expect(result.entries[0].isValid).toBe(true)
   })
 
-  it('skips reference fields in valid/invalid computation', async () => {
+  it('marks entry invalid when required reference field has no value (presence check)', async () => {
     mockFindBySlugWithFields.mockResolvedValue(fakeCt({
       fields: [
-        { id: 1, contentTypeId: 1, name: 'Author', type: 'reference', required: true, position: 0, options: {}, createdAt: new Date(), updatedAt: new Date() },
+        { id: 1, contentTypeId: 1, name: 'Author', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' }, createdAt: new Date(), updatedAt: new Date() },
+      ],
+    }))
+    mockList.mockResolvedValue([fakeEntryRow({})])
+    const result = await listEntries('car')
+    expect(result.entries[0].isValid).toBe(false)
+  })
+
+  it('marks entry valid when required reference field has a numeric id value', async () => {
+    mockFindBySlugWithFields.mockResolvedValue(fakeCt({
+      fields: [
+        { id: 1, contentTypeId: 1, name: 'Author', type: 'reference', required: true, position: 0, options: { targetSlug: 'person' }, createdAt: new Date(), updatedAt: new Date() },
+      ],
+    }))
+    mockList.mockResolvedValue([fakeEntryRow({ Author: 3 })])
+    const result = await listEntries('car')
+    expect(result.entries[0].isValid).toBe(true)
+  })
+
+  it('marks entry valid when optional reference field has no value', async () => {
+    mockFindBySlugWithFields.mockResolvedValue(fakeCt({
+      fields: [
+        { id: 1, contentTypeId: 1, name: 'Author', type: 'reference', required: false, position: 0, options: { targetSlug: 'person' }, createdAt: new Date(), updatedAt: new Date() },
       ],
     }))
     mockList.mockResolvedValue([fakeEntryRow({})])

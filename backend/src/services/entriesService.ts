@@ -7,7 +7,7 @@ function computeIsValid(
   fields: Array<{ name: string; type: string; required: boolean }>,
 ): boolean {
   return fields
-    .filter(f => f.required && f.type !== 'boolean' && f.type !== 'reference')
+    .filter(f => f.required && f.type !== 'boolean')
     .every(f => {
       const val = data[f.name]
       return val !== undefined && val !== null && val !== ''

@@ -12,6 +12,7 @@ vi.mock('../../services/contentTypes')
 
 const mockGetEntry = vi.mocked(entryService.getEntry)
 const mockUpdateEntry = vi.mocked(entryService.updateEntry)
+const mockGetEntries = vi.mocked(entryService.getEntries)
 const mockGetCT = vi.mocked(ctService.getContentType)
 const mockNavigate = vi.fn()
 
@@ -23,8 +24,26 @@ vi.mock('react-router-dom', async () => {
 const fakeCT: ContentType = {
   id: 1, name: 'Car', slug: 'car', version: 1,
   fields: [
-    { id: 1, name: 'Brand', type: 'text', required: true, position: 0 },
-    { id: 2, name: 'Year', type: 'number', required: false, position: 1 },
+    { id: 1, content_type_id: 1, name: 'Brand', type: 'text', required: true, position: 0 },
+    { id: 2, content_type_id: 1, name: 'Year', type: 'number', required: false, position: 1 },
+  ],
+}
+
+const fakeCTWithRef: ContentType = {
+  id: 1, name: 'Car', slug: 'car', version: 1,
+  fields: [
+    { id: 1, content_type_id: 1, name: 'Brand', type: 'text', required: true, position: 0 },
+    { id: 3, content_type_id: 1, name: 'Owner', type: 'reference', required: false, position: 1, options: { targetSlug: 'person' } },
+  ],
+}
+
+const fakePersonEntries = {
+  contentType: { id: 2, name: 'Person', slug: 'person', version: 1, fields: [
+    { id: 10, name: 'Full Name', type: 'text', required: true, position: 0 },
+  ]},
+  entries: [
+    { id: 1, data: { 'Full Name': 'Alice Souza' }, isValid: true },
+    { id: 2, data: { 'Full Name': 'Bob Lima' }, isValid: true },
   ],
 }
 
@@ -50,6 +69,7 @@ describe('EditEntry', () => {
     mockGetCT.mockResolvedValue(fakeCT)
     mockGetEntry.mockResolvedValue(fakeEntry)
     mockUpdateEntry.mockResolvedValue({ ...fakeEntry, data: { Brand: 'Honda', Year: 2022 } })
+    mockGetEntries.mockResolvedValue(fakePersonEntries)
   })
 
   it('loads and pre-fills the form with existing entry data', async () => {
@@ -129,5 +149,32 @@ describe('EditEntry', () => {
     await vi.waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith('/', { state: { error: 'Content type not found.' } })
     )
+  })
+
+  it('renders reference field as a select with entries from target type', async () => {
+    mockGetCT.mockResolvedValue(fakeCTWithRef)
+    mockGetEntry.mockResolvedValue({ id: 1, data: { Brand: 'Toyota', Owner: 2 }, isValid: true })
+    render$()
+    const select = await screen.findByRole('combobox', { name: /owner/i })
+    expect(select).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Alice Souza' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Bob Lima' })).toBeInTheDocument()
+  })
+
+  it('pre-selects the current reference value on edit', async () => {
+    mockGetCT.mockResolvedValue(fakeCTWithRef)
+    mockGetEntry.mockResolvedValue({ id: 1, data: { Brand: 'Toyota', Owner: 2 }, isValid: true })
+    render$()
+    const select = await screen.findByRole('combobox', { name: /owner/i }) as HTMLSelectElement
+    await vi.waitFor(() => expect(select.value).toBe('2'))
+  })
+
+  it('shows "Entry no longer exists" when referenced entry was deleted', async () => {
+    mockGetCT.mockResolvedValue(fakeCTWithRef)
+    mockGetEntry.mockResolvedValue({ id: 1, data: { Brand: 'Toyota', Owner: 99 }, isValid: false })
+    mockGetEntries.mockResolvedValue({ ...fakePersonEntries, entries: [] })
+    render$()
+    await screen.findByDisplayValue('Toyota')
+    expect(await screen.findByText(/no longer exists/i)).toBeInTheDocument()
   })
 })
