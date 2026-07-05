@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getEntries, deleteEntry } from '../../services/entries'
+import { socket } from '../../services/socket'
 import ErrorBanner from '../../components/shared/ErrorBanner'
 import type { EntryListResponse } from '../../types/entry'
 
@@ -15,7 +16,7 @@ export default function EntryList() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [bannerError, setBannerError] = useState(locationError)
 
-  useEffect(() => {
+  const fetchEntries = useCallback(() => {
     if (!slug) return
     getEntries(slug)
       .then(setData)
@@ -28,6 +29,31 @@ export default function EntryList() {
       })
       .finally(() => setLoading(false))
   }, [slug, navigate])
+
+  useEffect(() => {
+    fetchEntries()
+  }, [fetchEntries])
+
+  useEffect(() => {
+    const onEntryEvent = (payload: { slug: string }) => {
+      if (payload.slug === slug) fetchEntries()
+    }
+    const onCtDeleted = (payload: { slug: string }) => {
+      if (payload.slug === slug) navigate('/', { state: { error: 'Content type was deleted.' } })
+    }
+
+    socket.on('entry:created', onEntryEvent)
+    socket.on('entry:updated', onEntryEvent)
+    socket.on('entry:deleted', onEntryEvent)
+    socket.on('content-type:deleted', onCtDeleted)
+
+    return () => {
+      socket.off('entry:created', onEntryEvent)
+      socket.off('entry:updated', onEntryEvent)
+      socket.off('entry:deleted', onEntryEvent)
+      socket.off('content-type:deleted', onCtDeleted)
+    }
+  }, [slug, navigate, fetchEntries])
 
   async function handleDelete(id: number) {
     if (!window.confirm('Delete this entry? This cannot be undone.')) return
