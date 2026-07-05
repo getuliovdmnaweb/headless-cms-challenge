@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { deleteContentType, listContentTypes } from '../../services/contentTypes'
+import { socket } from '../../services/socket'
 import ErrorBanner from '../../components/shared/ErrorBanner'
 import type { ContentTypeSummary } from '../../types/contentType'
 
@@ -12,12 +13,27 @@ export default function ContentTypeList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const fetchTypes = useCallback(() => {
     listContentTypes()
       .then(setTypes)
       .catch(() => setError('Something went wrong'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    fetchTypes()
+  }, [fetchTypes])
+
+  useEffect(() => {
+    socket.on('content-type:created', fetchTypes)
+    socket.on('content-type:updated', fetchTypes)
+    socket.on('content-type:deleted', fetchTypes)
+    return () => {
+      socket.off('content-type:created', fetchTypes)
+      socket.off('content-type:updated', fetchTypes)
+      socket.off('content-type:deleted', fetchTypes)
+    }
+  }, [fetchTypes])
 
   async function handleDelete(slug: string, name: string) {
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
