@@ -1,10 +1,20 @@
 import request from 'supertest'
 import { app } from '../app'
 import { prisma } from '../db'
+import { getIo } from '../socket'
+
+jest.mock('../socket', () => ({
+  getIo: jest.fn(),
+  initIo: jest.fn(),
+}))
+
+let mockEmit: jest.Mock
 
 beforeEach(async () => {
   await prisma.field.deleteMany()
   await prisma.contentType.deleteMany()
+  mockEmit = jest.fn()
+  jest.mocked(getIo).mockReturnValue({ emit: mockEmit } as any)
 })
 
 afterAll(async () => {
@@ -27,6 +37,7 @@ describe('POST /api/content-types', () => {
     expect(res.body.name).toBe('Article')
     expect(res.body.slug).toBe('article')
     expect(res.body.fields).toHaveLength(2)
+    expect(mockEmit).toHaveBeenCalledWith('content-type:created', expect.objectContaining({ slug: 'article' }))
   })
 
   it('returns 400 when name is missing', async () => {
@@ -120,10 +131,12 @@ describe('DELETE /api/content-types/:slug', () => {
       name: 'Deletable',
       fields: [{ name: 'Title', type: 'text', required: false, position: 0 }],
     })
+    mockEmit.mockClear()
     const res = await request(app).delete('/api/content-types/deletable')
     expect(res.status).toBe(204)
     const check = await request(app).get('/api/content-types/deletable')
     expect(check.status).toBe(404)
+    expect(mockEmit).toHaveBeenCalledWith('content-type:deleted', { slug: 'deletable' })
   })
 })
 
@@ -140,6 +153,7 @@ describe('PUT /api/content-types/:slug', () => {
       name: 'Car',
       fields: [{ name: 'Brand', type: 'text', required: true, position: 0 }],
     })
+    mockEmit.mockClear()
 
     const res = await request(app)
       .put('/api/content-types/car')
@@ -155,6 +169,7 @@ describe('PUT /api/content-types/:slug', () => {
     expect(res.body.name).toBe('Automobile')
     expect(res.body.slug).toBe('car')
     expect(res.body.fields).toHaveLength(2)
+    expect(mockEmit).toHaveBeenCalledWith('content-type:updated', expect.objectContaining({ slug: 'car' }))
   })
 
   it('returns 400 when name is missing', async () => {
