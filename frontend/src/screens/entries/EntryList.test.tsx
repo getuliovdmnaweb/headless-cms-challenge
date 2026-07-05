@@ -3,12 +3,19 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import EntryList from './EntryList'
 import * as service from '../../services/entries'
+import { socket } from '../../services/socket'
 import type { EntryListResponse } from '../../types/entry'
 
 vi.mock('../../services/entries')
+vi.mock('../../services/socket', () => ({
+  socket: { on: vi.fn(), off: vi.fn() },
+}))
+
 const mockGet = vi.mocked(service.getEntries)
 const mockDelete = vi.mocked(service.deleteEntry)
 const mockNavigate = vi.fn()
+const mockOn = vi.mocked(socket.on)
+const mockOff = vi.mocked(socket.off)
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -37,6 +44,12 @@ function render$(slug = 'car', locationState?: object) {
       </Routes>
     </MemoryRouter>
   )
+}
+
+function getHandler(event: string): (...args: unknown[]) => void {
+  const call = mockOn.mock.calls.find(([e]) => e === event)
+  if (!call) throw new Error(`No socket.on handler registered for "${event}"`)
+  return call[1] as (...args: unknown[]) => void
 }
 
 describe('EntryList', () => {
@@ -164,5 +177,101 @@ describe('EntryList', () => {
   it('shows ErrorBanner from location state on load', async () => {
     render$('car', { error: 'Entry not found.' })
     expect(await screen.findByText('Entry not found.')).toBeInTheDocument()
+  })
+
+  describe('real-time socket subscriptions', () => {
+    it('registers handlers for entry and CT events on mount', async () => {
+      render$()
+      await screen.findByRole('heading', { name: /car/i })
+
+      const events = mockOn.mock.calls.map(([e]) => e)
+      expect(events).toContain('entry:created')
+      expect(events).toContain('entry:updated')
+      expect(events).toContain('entry:deleted')
+      expect(events).toContain('content-type:deleted')
+    })
+
+    it('refetches entries when entry:created fires for this slug', async () => {
+      render$()
+      await screen.findByText('Toyota')
+
+      const updatedResponse: EntryListResponse = {
+        ...fakeResponse,
+        entries: [...fakeResponse.entries, { id: 3, data: { Brand: 'Honda', Year: 2022 }, isValid: true }],
+      }
+      mockGet.mockResolvedValue(updatedResponse)
+      getHandler('entry:created')({ slug: 'car' })
+
+      expect(await screen.findByText('Honda')).toBeInTheDocument()
+      expect(mockGet).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not refetch when entry:created fires for a different slug', async () => {
+      render$()
+      await screen.findByText('Toyota')
+
+      getHandler('entry:created')({ slug: 'other' })
+
+      await vi.waitFor(() => expect(mockGet).toHaveBeenCalledTimes(1))
+    })
+
+    it('refetches entries when entry:updated fires for this slug', async () => {
+      render$()
+      await screen.findByText('Toyota')
+
+      const updatedResponse: EntryListResponse = {
+        ...fakeResponse,
+        entries: [{ id: 1, data: { Brand: 'Toyota Updated', Year: 2021 }, isValid: true }],
+      }
+      mockGet.mockResolvedValue(updatedResponse)
+      getHandler('entry:updated')({ slug: 'car' })
+
+      expect(await screen.findByText('Toyota Updated')).toBeInTheDocument()
+      expect(mockGet).toHaveBeenCalledTimes(2)
+    })
+
+    it('refetches entries when entry:deleted fires for this slug', async () => {
+      render$()
+      await screen.findByText('Toyota')
+
+      mockGet.mockResolvedValue({ ...fakeResponse, entries: [] })
+      getHandler('entry:deleted')({ slug: 'car' })
+
+      await vi.waitFor(() => expect(screen.queryByText('Toyota')).not.toBeInTheDocument())
+      expect(mockGet).toHaveBeenCalledTimes(2)
+    })
+
+    it('navigates to / with error when content-type:deleted fires for this slug', async () => {
+      render$()
+      await screen.findByText('Toyota')
+
+      getHandler('content-type:deleted')({ slug: 'car' })
+
+      await vi.waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith('/', { state: { error: 'Content type was deleted.' } })
+      )
+    })
+
+    it('does not navigate when content-type:deleted fires for a different slug', async () => {
+      render$()
+      await screen.findByText('Toyota')
+
+      getHandler('content-type:deleted')({ slug: 'other' })
+
+      await vi.waitFor(() => expect(mockNavigate).not.toHaveBeenCalled())
+    })
+
+    it('deregisters all handlers on unmount', async () => {
+      const { unmount } = render$()
+      await screen.findByText('Toyota')
+
+      unmount()
+
+      const offEvents = mockOff.mock.calls.map(([e]) => e)
+      expect(offEvents).toContain('entry:created')
+      expect(offEvents).toContain('entry:updated')
+      expect(offEvents).toContain('entry:deleted')
+      expect(offEvents).toContain('content-type:deleted')
+    })
   })
 })
