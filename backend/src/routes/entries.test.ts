@@ -1,6 +1,14 @@
 import request from 'supertest'
 import { app } from '../app'
 import { prisma } from '../db'
+import { getIo } from '../socket'
+
+jest.mock('../socket', () => ({
+  getIo: jest.fn(),
+  initIo: jest.fn(),
+}))
+
+let mockEmit: jest.Mock
 
 const carPayload = {
   name: 'Car',
@@ -14,6 +22,8 @@ beforeEach(async () => {
   await prisma.entry.deleteMany()
   await prisma.field.deleteMany()
   await prisma.contentType.deleteMany()
+  mockEmit = jest.fn()
+  jest.mocked(getIo).mockReturnValue({ emit: mockEmit } as any)
 })
 
 afterAll(async () => {
@@ -108,12 +118,14 @@ describe('PUT /api/content-types/:slug/entries/:id', () => {
     const created = await request(app)
       .post('/api/content-types/car/entries')
       .send({ data: { Brand: 'Toyota' } })
+    mockEmit.mockClear()
     const res = await request(app)
       .put(`/api/content-types/car/entries/${created.body.id}`)
       .send({ data: { Brand: 'Honda', Year: 2022 } })
     expect(res.status).toBe(200)
     expect(res.body.data.Brand).toBe('Honda')
     expect(res.body.isValid).toBe(true)
+    expect(mockEmit).toHaveBeenCalledWith('entry:updated', expect.objectContaining({ slug: 'car' }))
   })
 })
 
@@ -134,10 +146,12 @@ describe('DELETE /api/content-types/:slug/entries/:id', () => {
     const created = await request(app)
       .post('/api/content-types/car/entries')
       .send({ data: { Brand: 'Toyota' } })
+    mockEmit.mockClear()
     const res = await request(app).delete(`/api/content-types/car/entries/${created.body.id}`)
     expect(res.status).toBe(204)
     const check = await request(app).get(`/api/content-types/car/entries/${created.body.id}`)
     expect(check.status).toBe(404)
+    expect(mockEmit).toHaveBeenCalledWith('entry:deleted', expect.objectContaining({ slug: 'car' }))
   })
 })
 
@@ -158,12 +172,14 @@ describe('POST /api/content-types/:slug/entries', () => {
 
   it('creates entry and returns 201 with isValid', async () => {
     await request(app).post('/api/content-types').send(carPayload)
+    mockEmit.mockClear()
     const res = await request(app)
       .post('/api/content-types/car/entries')
       .send({ data: { Brand: 'Tesla', Year: 2023 } })
     expect(res.status).toBe(201)
     expect(res.body.data.Brand).toBe('Tesla')
     expect(res.body.isValid).toBe(true)
+    expect(mockEmit).toHaveBeenCalledWith('entry:created', expect.objectContaining({ slug: 'car' }))
   })
 
   it('creates entry and marks it invalid when required field missing', async () => {

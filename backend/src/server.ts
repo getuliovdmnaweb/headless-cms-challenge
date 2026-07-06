@@ -1,12 +1,12 @@
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { app } from './app'
+import { initIo } from './socket'
 
 const httpServer = createServer(app)
 
-export const io = new Server(httpServer, {
-  cors: { origin: '*' },
-})
+const io = new Server(httpServer, { cors: { origin: '*' } })
+initIo(io)
 
 const PORT = process.env.PORT ?? 4000
 

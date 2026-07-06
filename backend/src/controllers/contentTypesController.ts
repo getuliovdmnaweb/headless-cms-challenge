@@ -1,10 +1,12 @@
 import { Request, Response } from 'express'
 import * as ContentTypesService from '../services/contentTypesService'
 import { AppErrors } from '../constants/errors'
+import { getIo } from '../socket'
 
 export async function deleteContentType(req: Request, res: Response): Promise<void> {
   try {
     await ContentTypesService.deleteContentType(req.params.slug)
+    getIo().emit('content-type:deleted', { slug: req.params.slug })
     res.status(204).send()
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : AppErrors.INTERNAL_SERVER_ERROR.error
@@ -45,6 +47,7 @@ export async function updateContentType(req: Request, res: Response): Promise<vo
 
   try {
     const contentType = await ContentTypesService.updateContentType(req.params.slug, { name: name.trim(), fields })
+    getIo().emit('content-type:updated', contentType)
     res.json(contentType)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : AppErrors.INTERNAL_SERVER_ERROR.error
@@ -75,6 +78,7 @@ export async function createContentType(req: Request, res: Response): Promise<vo
 
   try {
     const contentType = await ContentTypesService.createContentType({ name: name.trim(), fields })
+    getIo().emit('content-type:created', contentType)
     res.status(201).json(contentType)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : AppErrors.INTERNAL_SERVER_ERROR.error

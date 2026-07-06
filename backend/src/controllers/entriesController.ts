@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import * as EntriesService from '../services/entriesService'
 import { AppErrors } from '../constants/errors'
+import { getIo } from '../socket'
 
 export async function listEntries(req: Request, res: Response): Promise<void> {
   try {
@@ -41,6 +42,7 @@ export async function updateEntry(req: Request, res: Response): Promise<void> {
   }
   try {
     const entry = await EntriesService.updateEntry(req.params.slug, Number(req.params.id), data)
+    getIo().emit('entry:updated', { slug: req.params.slug, entry })
     res.json(entry)
   } catch (err) {
     mapError(err, res)
@@ -50,6 +52,7 @@ export async function updateEntry(req: Request, res: Response): Promise<void> {
 export async function deleteEntry(req: Request, res: Response): Promise<void> {
   try {
     await EntriesService.deleteEntry(req.params.slug, Number(req.params.id))
+    getIo().emit('entry:deleted', { slug: req.params.slug, id: Number(req.params.id) })
     res.status(204).send()
   } catch (err) {
     mapError(err, res)
@@ -66,6 +69,7 @@ export async function createEntry(req: Request, res: Response): Promise<void> {
 
   try {
     const entry = await EntriesService.createEntry(req.params.slug, data)
+    getIo().emit('entry:created', { slug: req.params.slug, entry })
     res.status(201).json(entry)
   } catch (err) {
     mapError(err, res)
