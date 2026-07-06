@@ -1,6 +1,13 @@
 import request from 'supertest'
 import { app } from '../app'
 import { prisma } from '../db'
+import { getIo } from '../socket'
+
+jest.mock('../socket', () => ({ getIo: jest.fn(), initIo: jest.fn() }))
+
+beforeAll(() => {
+  jest.mocked(getIo).mockReturnValue({ emit: jest.fn() } as any)
+})
 
 const carPayload = {
   name: 'Car',
