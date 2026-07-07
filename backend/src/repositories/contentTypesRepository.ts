@@ -66,6 +66,15 @@ export async function deleteBySlug(slug: string): Promise<void> {
   })
 }
 
+export async function commitSchemaEvolution(
+  _slug: string,
+  _data: { name: string; fields: FieldInput[] },
+  _expectedVersion: number,
+  _entryUpdates: Array<{ id: number; data: Record<string, unknown> }>
+): Promise<unknown> {
+  throw new Error('not implemented')
+}
+
 export async function listWithFieldCount() {
   return prisma.contentType.findMany({
     orderBy: { createdAt: 'asc' },
