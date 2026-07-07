@@ -67,12 +67,39 @@ export async function deleteBySlug(slug: string): Promise<void> {
 }
 
 export async function commitSchemaEvolution(
-  _slug: string,
-  _data: { name: string; fields: FieldInput[] },
-  _expectedVersion: number,
-  _entryUpdates: Array<{ id: number; data: Record<string, unknown> }>
-): Promise<unknown> {
-  throw new Error('not implemented')
+  slug: string,
+  data: { name: string; fields: FieldInput[] },
+  expectedVersion: number,
+  entryUpdates: Array<{ id: number; data: Record<string, unknown> }>
+) {
+  return prisma.$transaction(async (tx) => {
+    const ct = await tx.contentType.findUnique({ where: { slug }, select: { id: true, version: true } })
+    if (!ct) throw new Error(`Content type not found: ${slug}`)
+    if (ct.version !== expectedVersion) throw new Error('Conflict: content type was modified by another session')
+
+    for (const { id, data: entryData } of entryUpdates) {
+      await tx.entry.update({ where: { id }, data: { data: entryData as any } })
+    }
+
+    await tx.field.deleteMany({ where: { contentType: { slug } } })
+    return tx.contentType.update({
+      where: { slug },
+      data: {
+        name: data.name,
+        version: { increment: 1 },
+        fields: {
+          create: data.fields.map(f => ({
+            name: f.name,
+            type: f.type,
+            required: f.required,
+            position: f.position,
+            options: { ...(f.options ?? {}) },
+          })),
+        },
+      },
+      include: { fields: { orderBy: { position: 'asc' } } },
+    })
+  })
 }
 
 export async function listWithFieldCount() {
