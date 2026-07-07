@@ -1,45 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { deleteContentType, listContentTypes } from '../../services/contentTypes'
-import { socket } from '../../services/socket'
 import ErrorBanner from '../../components/shared/ErrorBanner'
-import type { ContentTypeSummary } from '../../types/contentType'
+import Button from '../../components/ui/Button'
+import { useContentTypeList } from '../../hooks/useContentTypeList'
 
 export default function ContentTypeList() {
   const location = useLocation()
   const locationError = (location.state as { error?: string } | null)?.error ?? ''
-
-  const [types, setTypes] = useState<ContentTypeSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchTypes = useCallback(() => {
-    listContentTypes()
-      .then(setTypes)
-      .catch(() => setError('Something went wrong'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => {
-    fetchTypes()
-  }, [fetchTypes])
-
-  useEffect(() => {
-    socket.on('content-type:created', fetchTypes)
-    socket.on('content-type:updated', fetchTypes)
-    socket.on('content-type:deleted', fetchTypes)
-    return () => {
-      socket.off('content-type:created', fetchTypes)
-      socket.off('content-type:updated', fetchTypes)
-      socket.off('content-type:deleted', fetchTypes)
-    }
-  }, [fetchTypes])
-
-  async function handleDelete(slug: string, name: string) {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
-    await deleteContentType(slug)
-    setTypes(prev => prev.filter(t => t.slug !== slug))
-  }
+  const { types, loading, error, handleDelete } = useContentTypeList()
 
   if (loading) return <p className="p-8 text-sm text-gray-400">Loading…</p>
   if (error) return <p className="p-8 text-sm text-red-500">{error}</p>
@@ -79,14 +46,13 @@ export default function ContentTypeList() {
                   <td className="px-4 py-3 text-right space-x-3">
                     <Link to={`/${ct.slug}/entries`} className="text-sm text-indigo-600 hover:underline">View content</Link>
                     <Link to={`/edit/${ct.slug}`} className="text-sm text-gray-500 hover:underline">Edit fields</Link>
-                    <button
-                      type="button"
+                    <Button
+                      variant="danger"
                       aria-label={`Delete ${ct.name}`}
                       onClick={() => handleDelete(ct.slug, ct.name)}
-                      className="text-sm text-red-500 hover:underline"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
