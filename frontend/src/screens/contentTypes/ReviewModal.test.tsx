@@ -51,8 +51,7 @@ describe('ReviewModal', () => {
 
   it('shows type_change description with from and to types', () => {
     render(<ReviewModal impact={typeChangeImpact} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByText(/year/i)).toBeInTheDocument()
-    expect(screen.getByText(/text.*number/i)).toBeInTheDocument()
+    expect(screen.getByText(/year.*text.*number/i)).toBeInTheDocument()
   })
 
   it('shows field_deleted description', () => {
