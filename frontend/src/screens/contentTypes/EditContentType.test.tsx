@@ -35,6 +35,8 @@ vi.mock('../../services/contentTypes')
 const mockGet = vi.mocked(service.getContentType)
 const mockUpdate = vi.mocked(service.updateContentType)
 const mockList = vi.mocked(service.listContentTypes)
+const mockPreview = vi.mocked(service.previewChanges)
+const mockCommit = vi.mocked(service.commitChanges)
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -213,5 +215,71 @@ describe('EditContentType', () => {
         ]),
       }))
     )
+  })
+})
+
+describe('EditContentType — risky change highlighting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue(fakeContentType)
+    mockList.mockResolvedValue([])
+    mockPreview?.mockResolvedValue?.({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit?.mockResolvedValue?.(fakeContentType)
+  })
+
+  it('marks a row as risky when its type changes from the original', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const typeSelects = screen.getAllByRole('combobox')
+    await userEvent.selectOptions(typeSelects[0], 'number')
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(1)
+  })
+
+  it('marks a row as risky when required changes from optional to required', async () => {
+    render$()
+    await screen.findByDisplayValue('Year')
+    const checkboxes = screen.getAllByRole('checkbox')
+    await userEvent.click(checkboxes[1])
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(1)
+  })
+
+  it('marks a new field as risky if it is required', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    await userEvent.click(screen.getByRole('button', { name: /add field/i }))
+    const inputs = screen.getAllByPlaceholderText(/field name/i)
+    await userEvent.type(inputs[2], 'Color')
+    const checkboxes = screen.getAllByRole('checkbox')
+    await userEvent.click(checkboxes[2])
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(1)
+  })
+
+  it('does not mark a row as risky when type is unchanged', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(0)
+  })
+
+  it('does not mark a row as risky when relaxing required to optional', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const checkboxes = screen.getAllByRole('checkbox')
+    await userEvent.click(checkboxes[0])
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(0)
+  })
+
+  it('does not mark a new optional field as risky', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    await userEvent.click(screen.getByRole('button', { name: /add field/i }))
+    const inputs = screen.getAllByPlaceholderText(/field name/i)
+    await userEvent.type(inputs[2], 'Color')
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(0)
   })
 })
