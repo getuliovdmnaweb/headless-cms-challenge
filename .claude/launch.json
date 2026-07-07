@@ -6,6 +6,20 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "7788"],
       "port": 7788
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/getuliomoraes/Workspace/headless-cms-challenge/backend",
+      "port": 4000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/getuliomoraes/Workspace/headless-cms-challenge/frontend",
+      "port": 5173
     }
   ]
 }
