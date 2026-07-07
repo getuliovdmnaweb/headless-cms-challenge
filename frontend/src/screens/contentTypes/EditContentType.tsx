@@ -23,23 +23,30 @@ interface FieldRow extends FieldInput {
   error?: string
 }
 
+interface OriginalField {
+  type: string
+  required: boolean
+}
+
 let keyCounter = 0
 
 interface SortableFieldRowProps {
   field: FieldRow
   currentSlug: string
   allTypes: ContentTypeSummary[]
+  isRisky: boolean
   onChange: (key: number, patch: Partial<FieldRow>) => void
   onRemove: (key: number) => void
 }
 
-function SortableFieldRow({ field: f, currentSlug, allTypes, onChange, onRemove }: SortableFieldRowProps) {
+function SortableFieldRow({ field: f, currentSlug, allTypes, isRisky, onChange, onRemove }: SortableFieldRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: f._key })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const targetTypes = allTypes.filter(t => t.slug !== currentSlug)
+  const borderClass = isRisky ? 'border-amber-400 bg-amber-50' : f.error ? 'border-red-200 bg-white' : 'border-gray-200 bg-white'
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2 mb-2 p-2 border border-gray-200 rounded-md bg-white">
+    <div ref={setNodeRef} style={style} data-risky={isRisky ? 'true' : undefined} className={`flex items-center gap-2 mb-2 p-2 border rounded-md ${borderClass}`}>
       <span
         {...attributes}
         {...listeners}
@@ -108,6 +115,8 @@ export default function EditContentType() {
   const [fields, setFields] = useState<FieldRow[]>([])
   const [loading, setLoading] = useState(true)
   const [allTypes, setAllTypes] = useState<ContentTypeSummary[]>([])
+  const [originalFields, setOriginalFields] = useState<Map<string, OriginalField>>(new Map())
+  const [version, setVersion] = useState(1)
 
   const sensors = useSensors(useSensor(PointerSensor))
 
@@ -116,7 +125,9 @@ export default function EditContentType() {
     Promise.all([getContentType(slug), listContentTypes()])
       .then(([ct, types]) => {
         setName(ct.name)
+        setVersion(ct.version)
         setFields(ct.fields.map(f => ({ ...f, _key: keyCounter++ })))
+        setOriginalFields(new Map(ct.fields.map(f => [f.name, { type: f.type, required: f.required }])))
         setAllTypes(types)
       })
       .catch(() => navigate('/', { state: { error: 'Content type not found.' } }))
@@ -133,6 +144,16 @@ export default function EditContentType() {
 
   function removeField(key: number) {
     setFields(prev => prev.filter(f => f._key !== key).map((f, i) => ({ ...f, position: i })))
+  }
+
+  function isFieldRisky(row: FieldRow): boolean {
+    const orig = originalFields.get(row.name)
+    if (orig) {
+      if (orig.type !== row.type) return true
+      if (!orig.required && row.required) return true
+      return false
+    }
+    return row.required
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -235,7 +256,7 @@ export default function EditContentType() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={fields.map(f => f._key)} strategy={verticalListSortingStrategy}>
               {fields.map(f => (
-                <SortableFieldRow key={f._key} field={f} currentSlug={slug!} allTypes={allTypes} onChange={updateField} onRemove={removeField} />
+                <SortableFieldRow key={f._key} field={f} currentSlug={slug!} allTypes={allTypes} isRisky={isFieldRisky(f)} onChange={updateField} onRemove={removeField} />
               ))}
             </SortableContext>
           </DndContext>
