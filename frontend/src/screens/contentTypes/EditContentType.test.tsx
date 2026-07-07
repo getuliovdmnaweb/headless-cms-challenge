@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -35,6 +35,8 @@ vi.mock('../../services/contentTypes')
 const mockGet = vi.mocked(service.getContentType)
 const mockUpdate = vi.mocked(service.updateContentType)
 const mockList = vi.mocked(service.listContentTypes)
+const mockPreview = vi.mocked(service.previewChanges)
+const mockCommit = vi.mocked(service.commitChanges)
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -68,6 +70,8 @@ describe('EditContentType', () => {
     vi.clearAllMocks()
     mockGet.mockResolvedValue(fakeContentType)
     mockUpdate.mockResolvedValue({ ...fakeContentType, name: 'Automobile' })
+    mockPreview?.mockResolvedValue?.({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit?.mockResolvedValue?.(fakeContentType)
     mockList.mockResolvedValue([
       { id: 1, name: 'Car', slug: 'car', version: 1, fieldCount: 2 },
       { id: 2, name: 'Person', slug: 'person', version: 1, fieldCount: 1 },
@@ -148,16 +152,17 @@ describe('EditContentType', () => {
     expect(errors.length).toBeGreaterThan(0)
   })
 
-  it('calls updateContentType and navigates to list on success', async () => {
+  it('calls commitChanges and navigates to list on success', async () => {
     render$()
     await screen.findByDisplayValue('Car')
     fireEvent.submit(screen.getByRole('form'))
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('car', expect.objectContaining({ name: 'Car' })))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 1, {}))
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
   })
 
-  it('shows inline API error when name conflicts', async () => {
-    mockUpdate.mockRejectedValue(new Error('A content type with this name already exists'))
+  it('shows inline API error when commitChanges fails', async () => {
+    mockPreview.mockResolvedValue({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit.mockRejectedValue(new Error('A content type with this name already exists'))
     render$()
     await screen.findByDisplayValue('Car')
     fireEvent.submit(screen.getByRole('form'))
@@ -207,11 +212,162 @@ describe('EditContentType', () => {
     await userEvent.selectOptions(targetSelect, 'person')
     fireEvent.submit(screen.getByRole('form'))
     await waitFor(() =>
-      expect(mockUpdate).toHaveBeenCalledWith('car', expect.objectContaining({
-        fields: expect.arrayContaining([
-          expect.objectContaining({ type: 'reference', options: { targetSlug: 'person' } }),
-        ]),
-      }))
+      expect(mockCommit).toHaveBeenCalledWith('car', expect.arrayContaining([
+        expect.objectContaining({ type: 'reference', options: { targetSlug: 'person' } }),
+      ]), 1, {})
     )
+  })
+})
+
+describe('EditContentType — migration flow', () => {
+  const riskyImpact = {
+    changes: [{ kind: 'type_change' as const, fieldName: 'Year', from: 'number', to: 'text' }],
+    totalAffected: 2,
+    unconvertible: 0,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue(fakeContentType)
+    mockList.mockResolvedValue([])
+    mockPreview.mockResolvedValue({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit.mockResolvedValue(fakeContentType)
+  })
+
+  it('calls previewChanges on submit', async () => {
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(mockPreview).toHaveBeenCalledWith('car', expect.any(Array)))
+  })
+
+  it('calls commitChanges and navigates when no risky changes', async () => {
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 1, {}))
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
+  })
+
+  it('opens ReviewModal when preview returns risky changes', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('does not commit immediately when risky changes require review', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('dialog')
+    expect(mockCommit).not.toHaveBeenCalled()
+  })
+
+  it('calls commitChanges and navigates when modal Apply is clicked', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('dialog')
+    await userEvent.click(screen.getByRole('button', { name: /apply changes/i }))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 1, {}))
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
+  })
+
+  it('closes the modal when Cancel is clicked and does not commit', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /cancel/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mockCommit).not.toHaveBeenCalled()
+  })
+
+  it('shows conflict error when commitChanges rejects with Conflict', async () => {
+    mockPreview.mockResolvedValue({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit.mockRejectedValue(new Error('Content type was modified by another session. Reload and try again.'))
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    expect(await screen.findByText(/modified by another session/i)).toBeInTheDocument()
+  })
+
+  it('sends the correct version loaded from the content type', async () => {
+    mockGet.mockResolvedValue({ ...fakeContentType, version: 3 })
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 3, {}))
+  })
+})
+
+describe('EditContentType — risky change highlighting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue(fakeContentType)
+    mockList.mockResolvedValue([])
+    mockPreview?.mockResolvedValue?.({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit?.mockResolvedValue?.(fakeContentType)
+  })
+
+  it('marks a row as risky when its type changes from the original', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const typeSelects = screen.getAllByRole('combobox')
+    await userEvent.selectOptions(typeSelects[0], 'number')
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(1)
+  })
+
+  it('marks a row as risky when required changes from optional to required', async () => {
+    render$()
+    await screen.findByDisplayValue('Year')
+    const checkboxes = screen.getAllByRole('checkbox')
+    await userEvent.click(checkboxes[1])
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(1)
+  })
+
+  it('marks a new field as risky if it is required', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    await userEvent.click(screen.getByRole('button', { name: /add field/i }))
+    const inputs = screen.getAllByPlaceholderText(/field name/i)
+    await userEvent.type(inputs[2], 'Color')
+    const checkboxes = screen.getAllByRole('checkbox')
+    await userEvent.click(checkboxes[2])
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(1)
+  })
+
+  it('does not mark a row as risky when type is unchanged', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(0)
+  })
+
+  it('does not mark a row as risky when relaxing required to optional', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    const checkboxes = screen.getAllByRole('checkbox')
+    await userEvent.click(checkboxes[0])
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(0)
+  })
+
+  it('does not mark a new optional field as risky', async () => {
+    render$()
+    await screen.findByDisplayValue('Brand')
+    await userEvent.click(screen.getByRole('button', { name: /add field/i }))
+    const inputs = screen.getAllByPlaceholderText(/field name/i)
+    await userEvent.type(inputs[2], 'Color')
+    const riskyRows = document.querySelectorAll('[data-risky="true"]')
+    expect(riskyRows).toHaveLength(0)
   })
 })
