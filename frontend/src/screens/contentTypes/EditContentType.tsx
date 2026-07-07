@@ -15,8 +15,10 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getContentType, updateContentType, listContentTypes } from '../../services/contentTypes'
+import { getContentType, listContentTypes, previewChanges, commitChanges } from '../../services/contentTypes'
+import type { ImpactPreview } from '../../services/contentTypes'
 import type { FieldInput, FieldType, ContentTypeSummary } from '../../types/contentType'
+import ReviewModal from './ReviewModal'
 
 interface FieldRow extends FieldInput {
   _key: number
@@ -117,6 +119,7 @@ export default function EditContentType() {
   const [allTypes, setAllTypes] = useState<ContentTypeSummary[]>([])
   const [originalFields, setOriginalFields] = useState<Map<string, OriginalField>>(new Map())
   const [version, setVersion] = useState(1)
+  const [reviewModal, setReviewModal] = useState<ImpactPreview | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor))
 
@@ -190,15 +193,34 @@ export default function EditContentType() {
 
     if (!valid) return
 
+    const normalizedFields = fields.map(({ name, type, required, position, options }) => ({ name, type, required, position, options }))
+
     setSubmitting(true)
     setApiError(null)
     try {
-      await updateContentType(slug!, {
-        name: name.trim(),
-        fields: fields.map(({ name, type, required, position, options }) => ({ name, type, required, position, options })),
-      })
+      const impact = await previewChanges(slug!, normalizedFields)
+      if (impact.changes.length === 0) {
+        await commitChanges(slug!, normalizedFields, version, {})
+        navigate('/')
+      } else {
+        setReviewModal(impact)
+      }
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleModalConfirm(fallback: Record<string, unknown>) {
+    const normalizedFields = fields.map(({ name, type, required, position, options }) => ({ name, type, required, position, options }))
+    setSubmitting(true)
+    setApiError(null)
+    try {
+      await commitChanges(slug!, normalizedFields, version, fallback)
       navigate('/')
     } catch (err) {
+      setReviewModal(null)
       setApiError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setSubmitting(false)
@@ -210,6 +232,7 @@ export default function EditContentType() {
   if (loading) return null
 
   return (
+    <>
     <div className="max-w-5xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between pb-3 mb-6 border-b border-gray-200">
         <span className="text-sm font-medium text-gray-500">CMS admin</span>
@@ -294,5 +317,14 @@ export default function EditContentType() {
         </div>
       </form>
     </div>
+
+    {reviewModal && (
+      <ReviewModal
+        impact={reviewModal}
+        onConfirm={handleModalConfirm}
+        onCancel={() => setReviewModal(null)}
+      />
+    )}
+    </>
   )
 }

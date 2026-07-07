@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -70,6 +70,8 @@ describe('EditContentType', () => {
     vi.clearAllMocks()
     mockGet.mockResolvedValue(fakeContentType)
     mockUpdate.mockResolvedValue({ ...fakeContentType, name: 'Automobile' })
+    mockPreview?.mockResolvedValue?.({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit?.mockResolvedValue?.(fakeContentType)
     mockList.mockResolvedValue([
       { id: 1, name: 'Car', slug: 'car', version: 1, fieldCount: 2 },
       { id: 2, name: 'Person', slug: 'person', version: 1, fieldCount: 1 },
@@ -150,16 +152,17 @@ describe('EditContentType', () => {
     expect(errors.length).toBeGreaterThan(0)
   })
 
-  it('calls updateContentType and navigates to list on success', async () => {
+  it('calls commitChanges and navigates to list on success', async () => {
     render$()
     await screen.findByDisplayValue('Car')
     fireEvent.submit(screen.getByRole('form'))
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('car', expect.objectContaining({ name: 'Car' })))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 1, {}))
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
   })
 
-  it('shows inline API error when name conflicts', async () => {
-    mockUpdate.mockRejectedValue(new Error('A content type with this name already exists'))
+  it('shows inline API error when commitChanges fails', async () => {
+    mockPreview.mockResolvedValue({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit.mockRejectedValue(new Error('A content type with this name already exists'))
     render$()
     await screen.findByDisplayValue('Car')
     fireEvent.submit(screen.getByRole('form'))
@@ -209,11 +212,9 @@ describe('EditContentType', () => {
     await userEvent.selectOptions(targetSelect, 'person')
     fireEvent.submit(screen.getByRole('form'))
     await waitFor(() =>
-      expect(mockUpdate).toHaveBeenCalledWith('car', expect.objectContaining({
-        fields: expect.arrayContaining([
-          expect.objectContaining({ type: 'reference', options: { targetSlug: 'person' } }),
-        ]),
-      }))
+      expect(mockCommit).toHaveBeenCalledWith('car', expect.arrayContaining([
+        expect.objectContaining({ type: 'reference', options: { targetSlug: 'person' } }),
+      ]), 1, {})
     )
   })
 })
@@ -281,8 +282,8 @@ describe('EditContentType — migration flow', () => {
     render$()
     await screen.findByDisplayValue('Car')
     fireEvent.submit(screen.getByRole('form'))
-    await screen.findByRole('dialog')
-    await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /cancel/i }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(mockCommit).not.toHaveBeenCalled()
   })
