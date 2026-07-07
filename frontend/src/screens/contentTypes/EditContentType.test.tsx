@@ -218,6 +218,93 @@ describe('EditContentType', () => {
   })
 })
 
+describe('EditContentType — migration flow', () => {
+  const riskyImpact = {
+    changes: [{ kind: 'type_change' as const, fieldName: 'Year', from: 'number', to: 'text' }],
+    totalAffected: 2,
+    unconvertible: 0,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue(fakeContentType)
+    mockList.mockResolvedValue([])
+    mockPreview.mockResolvedValue({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit.mockResolvedValue(fakeContentType)
+  })
+
+  it('calls previewChanges on submit', async () => {
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(mockPreview).toHaveBeenCalledWith('car', expect.any(Array)))
+  })
+
+  it('calls commitChanges and navigates when no risky changes', async () => {
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 1, {}))
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
+  })
+
+  it('opens ReviewModal when preview returns risky changes', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('does not commit immediately when risky changes require review', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('dialog')
+    expect(mockCommit).not.toHaveBeenCalled()
+  })
+
+  it('calls commitChanges and navigates when modal Apply is clicked', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('dialog')
+    await userEvent.click(screen.getByRole('button', { name: /apply changes/i }))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 1, {}))
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'))
+  })
+
+  it('closes the modal when Cancel is clicked and does not commit', async () => {
+    mockPreview.mockResolvedValue(riskyImpact)
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('dialog')
+    await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mockCommit).not.toHaveBeenCalled()
+  })
+
+  it('shows conflict error when commitChanges rejects with Conflict', async () => {
+    mockPreview.mockResolvedValue({ changes: [], totalAffected: 0, unconvertible: 0 })
+    mockCommit.mockRejectedValue(new Error('Content type was modified by another session. Reload and try again.'))
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    expect(await screen.findByText(/modified by another session/i)).toBeInTheDocument()
+  })
+
+  it('sends the correct version loaded from the content type', async () => {
+    mockGet.mockResolvedValue({ ...fakeContentType, version: 3 })
+    render$()
+    await screen.findByDisplayValue('Car')
+    fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledWith('car', expect.any(Array), 3, {}))
+  })
+})
+
 describe('EditContentType — risky change highlighting', () => {
   beforeEach(() => {
     vi.clearAllMocks()
